@@ -24,6 +24,15 @@ The goal is to stay close to the upstream OpenAI plugin's UX, but Claude Code an
 | Rescue agent | Plugin-local Codex rescue agent inside Claude | Global `cc-rescue` agent in `~/.codex/agents` |
 | Model / effort flags | Codex model names and Codex effort controls | Claude model names and Claude effort values: `low`, `medium`, `high`, `max` |
 
+## Where This Goes Further
+
+In addition to mirroring the upstream command surface, this repository adds a few implementation-focused optimizations:
+
+- The stop-time review gate computes a turn baseline and skips Claude review entirely when the most recent Codex turn made no net edits, which helps avoid unnecessary token spend.
+- Nested helper sessions suppress stop-time review and unread-result prompts, so the review gate stays attached to the user-facing Codex thread instead of recursive child runs.
+- Background Claude jobs track unread/viewed state and session ownership, which makes `$cc:status`, `$cc:result`, and follow-up rescue flows safer for concurrent work.
+- The installer is idempotent and manages the personal marketplace entry, hooks, and global `cc-rescue` registration together, so install and reinstall are a single step.
+
 ## Requirements
 
 - Codex with hook support
@@ -34,42 +43,34 @@ The goal is to stay close to the upstream OpenAI plugin's UX, but Claude Code an
 
 ## Install
 
-### Quick Install
+Choose either install path below. Both install the plugin into `~/.codex/plugins/cc`, create or update `~/.agents/plugins/marketplace.json`, enable `cc@local-plugins` in `~/.codex/config.toml`, enable `codex_hooks = true`, and install Codex hooks plus the global `cc-rescue` agent.
+
+### npx
+
+```bash
+npx cc-plugin-codex install
+```
+
+### Shell Script
 
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
 ```
 
-The installer:
-
-- copies the plugin into `~/.codex/plugins/cc`
-- creates or updates `~/.agents/plugins/marketplace.json`
-- enables `cc@local-plugins` in `~/.codex/config.toml`
-- enables `codex_hooks = true`
-- installs Codex hooks and the global `cc-rescue` agent
-
 ### Update
 
-Rerun the install command. The installer is safe to run again and will refresh the installed copy in place.
+Rerun either install command. The installer is safe to run again and will refresh the installed copy in place.
 
 ```bash
+npx cc-plugin-codex update
 curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
 ```
 
 ### Uninstall
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/uninstall.sh" | bash
-```
-
-### npx
-
-If you install the npm package distribution, the same installer is exposed through the package CLI:
-
-```bash
-npx cc-plugin-codex install
-npx cc-plugin-codex update
 npx cc-plugin-codex uninstall
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/uninstall.sh" | bash
 ```
 
 ### Manual Install
