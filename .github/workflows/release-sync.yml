@@ -4,14 +4,22 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to sync, for example v1.0.0
+        required: false
 
 jobs:
   sync-marketplace:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -23,7 +31,7 @@ jobs:
           repository: sendbird/codex-plugins
           path: marketplace
           ssh-key: ${{ secrets.CODEX_PLUGINS_DEPLOY_KEY }}
-          persist-credentials: false
+          persist-credentials: true
       - name: Sync marketplace contents
         run: node scripts/sync-marketplace-release.mjs marketplace
       - name: Commit and push
@@ -36,5 +44,5 @@ jobs:
             echo "No marketplace changes to push."
             exit 0
           fi
-          git commit -m "Sync cc release ${GITHUB_REF_NAME}"
+          git commit -m "Sync cc release ${RELEASE_TAG}"
           git push origin HEAD:main
