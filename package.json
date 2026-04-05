@@ -11,13 +11,16 @@
   "homepage": "https://github.com/sendbird/cc-plugin-codex",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sendbird/cc-plugin-codex.git"
+    "url": "git+https://github.com/sendbird/cc-plugin-codex.git"
   },
   "bin": "scripts/installer-cli.mjs",
   "bugs": {
     "url": "https://github.com/sendbird/cc-plugin-codex/issues"
   },
   "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     ".codex-plugin",
     "CHANGELOG.md",
