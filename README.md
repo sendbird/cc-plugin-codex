@@ -31,74 +31,54 @@ The goal is to stay close to the upstream OpenAI plugin's UX, but Claude Code an
 - Claude Code CLI installed and authenticated
   - `claude auth login`, or
   - `ANTHROPIC_API_KEY` set in the environment
-- either the hosted Sendbird Codex marketplace or a local plugin registration
 
 ## Install
 
-### Hosted Marketplace Install
-
-Add this GitHub repository as a repo marketplace in Codex:
-
-```text
-https://github.com/sendbird/codex-plugins
-```
-
-Then install:
-
-```text
-cc@sendbird-codex
-```
-
-This repository, `sendbird/cc-plugin-codex`, is the plugin source repository used for development and releases.
-
-### Local Development Install
-
-Clone this repository under `~/plugins/cc`:
+### Quick Install
 
 ```bash
-mkdir -p ~/plugins
-git clone https://github.com/sendbird/cc-plugin-codex.git ~/plugins/cc
-cd ~/plugins/cc
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
 ```
 
-Add it to your local Codex marketplace file at `~/.agents/plugins/marketplace.json`:
+The installer:
 
-```json
-{
-  "name": "sendbird-local",
-  "interface": {
-    "displayName": "Sendbird Local Plugins"
-  },
-  "plugins": [
-    {
-      "name": "cc",
-      "source": {
-        "source": "local",
-        "path": "./plugins/cc"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Coding"
-    }
-  ]
-}
-```
+- copies the plugin into `~/.codex/plugins/cc`
+- creates or updates `~/.agents/plugins/marketplace.json`
+- enables `cc@local-plugins` in `~/.codex/config.toml`
+- enables `codex_hooks = true`
+- installs Codex hooks and the global `cc-rescue` agent
 
-The plugin path is relative to the marketplace root, matching the current Codex marketplace spec.
-
-Install hooks and the global `cc-rescue` agent:
+### Update
 
 ```bash
-node scripts/install-hooks.mjs
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/update.sh" | bash
 ```
 
-Enable Codex hooks in `~/.codex/config.toml`:
+### Uninstall
 
-```toml
-[features]
-codex_hooks = true
+```bash
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/uninstall.sh" | bash
+```
+
+### npx
+
+If you install the npm package distribution, the same installer is exposed through the package CLI:
+
+```bash
+npx cc-plugin-codex install
+npx cc-plugin-codex update
+npx cc-plugin-codex uninstall
+```
+
+### Manual Install
+
+If you want to work from a local checkout instead of the one-shot installer:
+
+```bash
+mkdir -p ~/.codex/plugins
+git clone https://github.com/sendbird/cc-plugin-codex.git ~/.codex/plugins/cc
+cd ~/.codex/plugins/cc
+node scripts/local-plugin-install.mjs install --plugin-root ~/.codex/plugins/cc
 ```
 
 If Claude Code is not installed yet:

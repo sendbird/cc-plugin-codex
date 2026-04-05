@@ -13,6 +13,9 @@
     "type": "git",
     "url": "https://github.com/sendbird/cc-plugin-codex.git"
   },
+  "bin": {
+    "cc-plugin-codex": "./scripts/installer-cli.mjs"
+  },
   "bugs": {
     "url": "https://github.com/sendbird/cc-plugin-codex/issues"
   },
@@ -24,10 +27,13 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run test:e2e",
+    "install:codex": "bash scripts/install.sh",
     "setup:git-hooks": "node scripts/setup-git-hooks.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:integration": "node --test tests/integration/*.test.mjs",
-    "test:e2e": "node --test tests/e2e/*.test.mjs"
+    "test:e2e": "node --test tests/e2e/*.test.mjs",
+    "uninstall:codex": "bash scripts/uninstall.sh",
+    "update:codex": "bash scripts/update.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
