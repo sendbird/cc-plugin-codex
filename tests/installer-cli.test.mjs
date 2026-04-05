@@ -53,7 +53,7 @@ function copyFixture(sourceRoot) {
   }
 }
 
-function runInstaller(command, homeDir, sourceRoot) {
+function runInstaller(command, homeDir, sourceRoot, extraEnv = {}) {
   const result = spawnSync(
     process.execPath,
     [path.join(sourceRoot, "scripts", "installer-cli.mjs"), command],
@@ -63,6 +63,7 @@ function runInstaller(command, homeDir, sourceRoot) {
         ...process.env,
         HOME: homeDir,
         USERPROFILE: homeDir,
+        ...extraEnv,
       },
       encoding: "utf8",
     }
@@ -116,6 +117,25 @@ describe("installer-cli", () => {
     const agent = fs.readFileSync(agentFile, "utf8");
     assert.ok(agent.includes(`${installDir}/scripts/claude-companion.mjs`));
     assert.ok(!agent.includes(sourceRoot));
+  });
+
+  it("installs successfully when CODEX_HOME is outside the user's home directory", () => {
+    const homeDir = makeTempHome();
+    const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "cc-external-codex-home-"));
+    tempHomes.push(codexHome);
+    const sourceRoot = makeTempSource();
+    copyFixture(sourceRoot);
+
+    runInstaller("install", homeDir, sourceRoot, { CODEX_HOME: codexHome });
+
+    const installDir = path.join(codexHome, "plugins", "cc");
+    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
+    const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
+    const expectedPath = `./${path.relative(homeDir, installDir).replace(/\\/g, "/")}`;
+
+    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
+    assert.equal(marketplace.plugins[0].source.path, expectedPath);
+    assert.ok(expectedPath.includes(".."));
   });
 
   it("uninstalls cleanly while preserving unrelated user config", () => {
@@ -199,6 +219,34 @@ describe("installer-cli", () => {
     assert.doesNotMatch(config, /\[agents\."cc-rescue"\]/);
     assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "echo custom-hook");
     assert.ok(!fs.existsSync(path.join(homeDir, ".codex", "agents", "cc-rescue.toml")));
+  });
+
+  it("preserves a user-managed cc-rescue config block on uninstall", () => {
+    const homeDir = makeTempHome();
+    const sourceRoot = makeTempSource();
+    copyFixture(sourceRoot);
+
+    const codexDir = path.join(homeDir, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexDir, "config.toml"),
+      [
+        '[agents."cc-rescue"]',
+        'description = "Custom rescue agent"',
+        'config_file = "agents/custom-cc-rescue.toml"',
+        "",
+      ].join("\n"),
+      "utf8"
+    );
+
+    runInstaller("install", homeDir, sourceRoot);
+    runInstaller("uninstall", homeDir, sourceRoot);
+
+    const config = fs.readFileSync(path.join(homeDir, ".codex", "config.toml"), "utf8");
+    assert.match(config, /\[agents\."cc-rescue"\]/);
+    assert.match(config, /description = "Custom rescue agent"/);
+    assert.match(config, /config_file = "agents\/custom-cc-rescue\.toml"/);
+    assert.doesNotMatch(config, /\[plugins\."cc@local-plugins"\]/);
   });
 
   it("shell installer wrappers parse cleanly", () => {

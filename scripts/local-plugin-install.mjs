@@ -27,6 +27,10 @@ const CODEX_AGENT_FILE = path.join(CODEX_HOME, "agents", "cc-rescue.toml");
 const MANAGED_AGENT_MARKER = "# Managed by cc-plugin-codex.";
 const PLUGIN_CONFIG_HEADER = `[plugins."${PLUGIN_NAME}@${MARKETPLACE_NAME}"]`;
 const AGENT_CONFIG_HEADER = '[agents."cc-rescue"]';
+const MANAGED_AGENT_REGISTRATION_LINES = [
+  'description = "Forward substantial rescue tasks to Claude Code through the companion runtime."',
+  'config_file = "agents/cc-rescue.toml"',
+];
 
 function usage() {
   console.error(
@@ -90,14 +94,14 @@ function normalizeTrailingNewline(text) {
 
 function resolveMarketplacePluginPath(pluginRoot) {
   const relative = path.relative(HOME_DIR, pluginRoot);
-  if (
-    !relative ||
-    relative === "" ||
-    relative.startsWith("..") ||
-    path.isAbsolute(relative)
-  ) {
+  if (!relative || relative === "") {
     throw new Error(
-      `Plugin root must live under ${HOME_DIR} for personal marketplace install: ${pluginRoot}`
+      `Plugin root must not be the marketplace root itself: ${pluginRoot}`
+    );
+  }
+  if (path.isAbsolute(relative)) {
+    throw new Error(
+      `Unable to express plugin root as a relative personal marketplace path: ${pluginRoot}`
     );
   }
   return `./${normalizePathSlashes(relative)}`;
@@ -219,6 +223,32 @@ function removeTomlSections(content, headers) {
   };
 }
 
+function getTomlSectionBodyLines(content, header) {
+  const lines = content.split("\n");
+  let inSection = false;
+  const body = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!inSection) {
+      if (trimmed === header) {
+        inSection = true;
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("[")) {
+      break;
+    }
+
+    if (trimmed !== "") {
+      body.push(trimmed);
+    }
+  }
+
+  return inSection ? body : null;
+}
+
 function appendTomlSection(content, header, bodyLines) {
   const base = content.replace(/\s*$/, "");
   const suffix = [header, ...bodyLines, ""].join("\n");
@@ -299,12 +329,27 @@ function writeConfigFile(content) {
 
 function removeLocalPluginConfig() {
   const existing = readConfigFile();
-  const { content, changed } = removeTomlSections(
-    existing,
-    new Set([PLUGIN_CONFIG_HEADER, AGENT_CONFIG_HEADER])
-  );
+  let nextContent = existing;
+  let changed = false;
+
+  const pluginRemoval = removeTomlSections(nextContent, new Set([PLUGIN_CONFIG_HEADER]));
+  nextContent = pluginRemoval.content;
+  changed ||= pluginRemoval.changed;
+
+  const agentSection = getTomlSectionBodyLines(nextContent, AGENT_CONFIG_HEADER);
+  const hasManagedAgentRegistration =
+    Array.isArray(agentSection) &&
+    agentSection.length === MANAGED_AGENT_REGISTRATION_LINES.length &&
+    agentSection.every((line, index) => line === MANAGED_AGENT_REGISTRATION_LINES[index]);
+
+  if (hasManagedAgentRegistration) {
+    const agentRemoval = removeTomlSections(nextContent, new Set([AGENT_CONFIG_HEADER]));
+    nextContent = agentRemoval.content;
+    changed ||= agentRemoval.changed;
+  }
+
   if (changed) {
-    writeConfigFile(content);
+    writeConfigFile(nextContent);
   }
 }
 
