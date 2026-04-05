@@ -13,13 +13,27 @@
     "type": "git",
     "url": "https://github.com/sendbird/cc-plugin-codex.git"
   },
-  "bin": {
-    "cc-plugin-codex": "./scripts/installer-cli.mjs"
-  },
+  "bin": "scripts/installer-cli.mjs",
   "bugs": {
     "url": "https://github.com/sendbird/cc-plugin-codex/issues"
   },
   "license": "Apache-2.0",
+  "files": [
+    ".codex-plugin",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "agents",
+    "assets",
+    "hooks",
+    "internal-skills",
+    "package.json",
+    "prompts",
+    "schemas",
+    "scripts",
+    "skills"
+  ],
   "engines": {
     "node": ">=18"
   },
