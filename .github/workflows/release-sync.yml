@@ -72,6 +72,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CODEX_PLUGINS_GH_TOKEN }}
         run: |
+          gh pr checks "${{ steps.sync_pr.outputs.pr_number }}" \
+            --repo "$MARKETPLACE_REPO" \
+            --watch \
+            --interval 10
+
           gh pr merge "${{ steps.sync_pr.outputs.pr_number }}" \
             --repo "$MARKETPLACE_REPO" \
             --squash \
