@@ -50,8 +50,10 @@ The installer:
 
 ### Update
 
+Rerun the install command. The installer is safe to run again and will refresh the installed copy in place.
+
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/update.sh" | bash
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
 ```
 
 ### Uninstall

@@ -202,7 +202,7 @@ describe("installer-cli", () => {
   });
 
   it("shell installer wrappers parse cleanly", () => {
-    for (const scriptName of ["install.sh", "update.sh", "uninstall.sh"]) {
+    for (const scriptName of ["install.sh", "uninstall.sh"]) {
       const result = spawnSync("bash", ["-n", path.join(PROJECT_ROOT, "scripts", scriptName)], {
         cwd: PROJECT_ROOT,
         encoding: "utf8",
