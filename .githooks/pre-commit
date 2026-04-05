@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+echo "[pre-commit] lint"
+npm run lint
+
+echo "[pre-commit] typecheck"
+npm run typecheck

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Claude Code Plugin for Codex screenshot">
+  <rect width="1440" height="900" fill="#0E1017"/>
+  <rect x="48" y="48" width="1344" height="804" rx="32" fill="#121521"/>
+  <rect x="80" y="80" width="1280" height="120" rx="24" fill="#0D0D0D"/>
+  <text x="120" y="138" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="44" font-weight="700" fill="#FFFFFF">Claude Code Plugin for Codex</text>
+  <text x="120" y="176" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="22" fill="#D9D9D9">Use Claude Code through the $cc skill surface for reviews, rescue tasks, and tracked job management.</text>
+
+  <rect x="80" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
+  <rect x="80" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
+  <text x="112" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:review</text>
+  <text x="112" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Run a standard Claude Code review on the</text>
+  <text x="112" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">current working tree or branch diff.</text>
+  <text x="112" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --wait, --background, --base, --scope, --model</text>
+
+  <rect x="520" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
+  <rect x="520" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
+  <text x="552" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:adversarial-review</text>
+  <text x="552" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Challenge design choices, assumptions, and</text>
+  <text x="552" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">tradeoffs before you ship.</text>
+  <text x="552" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --wait, --background, --base, --scope, --model, [focus]</text>
+
+  <rect x="960" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
+  <rect x="960" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
+  <text x="992" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:rescue</text>
+  <text x="992" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Delegate substantial implementation or</text>
+  <text x="992" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">debugging work to Claude Code.</text>
+  <text x="992" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --background, --wait, --resume, --write, --model, --effort</text>
+
+  <rect x="80" y="544" width="1280" height="252" rx="24" fill="#171B2A"/>
+  <text x="112" y="608" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">Tracked jobs and follow-up skills</text>
+  <text x="112" y="652" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">$cc:status shows live progress, $cc:result returns stored output, and $cc:cancel stops active jobs.</text>
+  <text x="112" y="708" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Marketplace-ready metadata includes Sendbird publisher info, legal links, install copy, and visual assets.</text>
+  <text x="112" y="752" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Repository: github.com/sendbird/cc-plugin-codex</text>
+</svg>

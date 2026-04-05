@@ -1,0 +1,39 @@
+{
+  "name": "cc-plugin-codex",
+  "version": "1.0.0",
+  "description": "Claude Code Plugin for Codex by Sendbird",
+  "type": "module",
+  "author": {
+    "name": "Sendbird, Inc.",
+    "email": "jin.ku@sendbird.com",
+    "url": "https://sendbird.com/"
+  },
+  "homepage": "https://github.com/sendbird/cc-plugin-codex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sendbird/cc-plugin-codex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sendbird/cc-plugin-codex/issues"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run test:e2e",
+    "setup:git-hooks": "node scripts/setup-git-hooks.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:integration": "node --test tests/integration/*.test.mjs",
+    "test:e2e": "node --test tests/e2e/*.test.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.2",
+    "eslint": "^10.2.0",
+    "globals": "^17.4.0",
+    "typescript": "^6.0.2"
+  }
+}
