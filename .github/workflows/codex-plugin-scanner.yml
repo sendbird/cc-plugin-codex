@@ -32,5 +32,3 @@ jobs:
 
       - name: Run scanner
         uses: hashgraph-online/hol-codex-plugin-scanner-action@40d95e49abdd8aeb34b534461a9fa4f96cdd4d7c # v1
-        with:
-          args: scan --fail-on critical
