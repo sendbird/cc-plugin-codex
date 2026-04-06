@@ -17,6 +17,7 @@
  * 6. Copy the managed cc-rescue agent file into ~/.codex/agents/cc-rescue.toml
  * 7. Ensure ~/.codex/config.toml registers [agents."cc-rescue"]
  * 8. Check if ~/.codex/config.toml has codex_hooks = true, print guidance if not
+ * 9. Ensure sandbox_workspace_write.network_access = true for OAuth keychain access
  */
 
 import fs from "node:fs";
@@ -162,6 +163,54 @@ function installRescueAgentFile() {
   writeTextFile(CODEX_RESCUE_AGENT_FILE, resolved);
   console.log(`Installed rescue agent at ${CODEX_RESCUE_AGENT_FILE}`);
   return { changed: true, backedUp: backupPath };
+}
+
+function hasSandboxNetworkAccess(configContent) {
+  // Match [sandbox_workspace_write] section with network_access = true
+  return /\[sandbox_workspace_write\][\s\S]*?network_access\s*=\s*true/m.test(configContent);
+}
+
+function ensureSandboxNetworkAccess() {
+  const existing = readTextFile(CODEX_CONFIG_TOML) ?? "";
+  if (hasSandboxNetworkAccess(existing)) {
+    return { changed: false };
+  }
+
+  // Check if the section exists but with network_access = false
+  if (/\[sandbox_workspace_write\]/m.test(existing)) {
+    // Section exists — update the value in place
+    const updated = existing.replace(
+      /(\[sandbox_workspace_write\][\s\S]*?)network_access\s*=\s*false/m,
+      "$1network_access = true"
+    );
+    if (updated !== existing) {
+      writeTextFile(CODEX_CONFIG_TOML, updated);
+      console.log("Updated sandbox_workspace_write.network_access to true in config.toml");
+      return { changed: true };
+    }
+    // Section exists but no network_access key — append it
+    const withKey = existing.replace(
+      /(\[sandbox_workspace_write\]\n)/m,
+      "$1network_access = true\n"
+    );
+    writeTextFile(CODEX_CONFIG_TOML, withKey);
+    console.log("Added network_access = true to existing [sandbox_workspace_write] in config.toml");
+    return { changed: true };
+  }
+
+  // Section doesn't exist — append it
+  const block = [
+    "",
+    "# Required for Claude Code OAuth: the macOS seatbelt sandbox blocks",
+    "# Keychain access (com.apple.SecurityServer) unless network_access is enabled.",
+    "[sandbox_workspace_write]",
+    "network_access = true",
+    "",
+  ].join("\n");
+
+  writeTextFile(CODEX_CONFIG_TOML, `${existing.replace(/\s*$/, "")}${block}`);
+  console.log("Added [sandbox_workspace_write] network_access = true to config.toml");
+  return { changed: true };
 }
 
 function hasRescueAgentRegistration(configContent) {
@@ -317,6 +366,9 @@ function main() {
 
   // Step 7: Ensure config.toml registers the rescue agent
   const agentRegistration = ensureRescueAgentRegistration();
+
+  // Step 9: Ensure sandbox allows keychain access for OAuth auth
+  const sandboxUpdate = ensureSandboxNetworkAccess();
 
   // Step 8: Check config.toml for codex_hooks setting
   let hasCodexHooks = false;
