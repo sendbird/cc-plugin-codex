@@ -24,12 +24,23 @@ const MARKETPLACE_FILE = path.join(HOME_DIR, ".agents", "plugins", "marketplace.
 const CODEX_CONFIG_FILE = path.join(CODEX_HOME, "config.toml");
 const CODEX_HOOKS_FILE = path.join(CODEX_HOME, "hooks.json");
 const CODEX_AGENT_FILE = path.join(CODEX_HOME, "agents", "cc-rescue.toml");
+const CODEX_SKILLS_DIR = path.join(CODEX_HOME, "skills");
+const CODEX_PROMPTS_DIR = path.join(CODEX_HOME, "prompts");
 const MANAGED_AGENT_MARKER = "# Managed by cc-plugin-codex.";
 const PLUGIN_CONFIG_HEADER = `[plugins."${PLUGIN_NAME}@${MARKETPLACE_NAME}"]`;
 const AGENT_CONFIG_HEADER = '[agents."cc-rescue"]';
 const MANAGED_AGENT_REGISTRATION_LINES = [
   'description = "Forward substantial rescue tasks to Claude Code through the companion runtime."',
   'config_file = "agents/cc-rescue.toml"',
+];
+const EXPORTED_SKILLS = [
+  "review",
+  "adversarial-review",
+  "rescue",
+  "status",
+  "result",
+  "cancel",
+  "setup",
 ];
 
 function usage() {
@@ -90,6 +101,127 @@ function writeText(filePath, content) {
 
 function normalizeTrailingNewline(text) {
   return `${text.replace(/\s*$/, "")}\n`;
+}
+
+function formatCodexPromptName(skillName) {
+  return `${PLUGIN_NAME}-${skillName}`;
+}
+
+function formatCodexSkillInvocationName(skillName) {
+  return `${PLUGIN_NAME}:${skillName}`;
+}
+
+function extractFrontmatterFields(markdown) {
+  const match = markdown.match(/^---\n([\s\S]*?)\n---\n?/);
+  const fields = new Map();
+  if (!match) {
+    return fields;
+  }
+
+  for (const line of match[1].split("\n")) {
+    const fieldMatch = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!fieldMatch) {
+      continue;
+    }
+    fields.set(fieldMatch[1], fieldMatch[2]);
+  }
+
+  return fields;
+}
+
+function rewriteSkillFrontmatter(markdown, skillName) {
+  return markdown.replace(
+    /^---\n([\s\S]*?)\n---/,
+    (_whole, body) => {
+      const nextLines = body.split("\n").map((line) => {
+        if (line.startsWith("name:")) {
+          return `name: ${formatCodexSkillInvocationName(skillName)}`;
+        }
+        return line;
+      });
+      return `---\n${nextLines.join("\n")}\n---`;
+    }
+  );
+}
+
+function rewriteSkillBody(markdown, pluginRoot) {
+  const normalizedPluginRoot = normalizePathSlashes(pluginRoot);
+  return markdown
+    .replaceAll("<plugin-root>", normalizedPluginRoot)
+    .replace(
+      new RegExp(
+        `Resolve \`${escapeRegExp(normalizedPluginRoot)}\` as two directories above this skill file\\. The companion entrypoint is:`,
+        "g"
+      ),
+      "Use the companion entrypoint at:"
+    )
+    .replace(
+      new RegExp(
+        `Resolve \`${escapeRegExp(normalizedPluginRoot)}\` as two directories above this skill file, then run:`,
+        "g"
+      ),
+      "Use the companion entrypoint:"
+    )
+    .replace(
+      new RegExp(
+        `The global cc-rescue agent is installed by \`node \"${escapeRegExp(normalizedPluginRoot)}\\/scripts\\/install-hooks\\.mjs\"\` and registered in ~\\/\\.codex\\/config\\.toml\\.\\n\\nUse the companion entrypoint at:`,
+        "g"
+      ),
+      `The global cc-rescue agent is installed by \`node "${normalizedPluginRoot}/scripts/install-hooks.mjs"\` and registered in \`~/.codex/config.toml\`.\n\nUse the companion entrypoint at:`
+    );
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function installCodexSkillWrappers(pluginRoot) {
+  for (const skillName of EXPORTED_SKILLS) {
+    const sourceSkillPath = path.join(pluginRoot, "skills", skillName, "SKILL.md");
+    const sourceSkill = readText(sourceSkillPath);
+    if (!sourceSkill) {
+      throw new Error(`Missing skill source: ${sourceSkillPath}`);
+    }
+
+    const wrappedSkill = rewriteSkillBody(
+      rewriteSkillFrontmatter(sourceSkill, skillName),
+      pluginRoot
+    );
+    const targetSkillPath = path.join(
+      CODEX_SKILLS_DIR,
+      formatCodexPromptName(skillName),
+      "SKILL.md"
+    );
+    writeText(targetSkillPath, normalizeTrailingNewline(wrappedSkill));
+
+    const frontmatterFields = extractFrontmatterFields(sourceSkill);
+    const promptLines = ["---"];
+    if (frontmatterFields.has("description")) {
+      promptLines.push(`description: ${frontmatterFields.get("description")}`);
+    }
+    promptLines.push("---", "");
+    promptLines.push(
+      `Use the $${formatCodexSkillInvocationName(skillName)} skill for this command and follow its instructions exactly.`,
+      "",
+      "Treat any text after the prompt name as the raw arguments to pass through."
+    );
+    writeText(
+      path.join(CODEX_PROMPTS_DIR, `${formatCodexPromptName(skillName)}.md`),
+      normalizeTrailingNewline(promptLines.join("\n"))
+    );
+  }
+}
+
+function removeCodexSkillWrappers() {
+  for (const skillName of EXPORTED_SKILLS) {
+    fs.rmSync(path.join(CODEX_SKILLS_DIR, formatCodexPromptName(skillName)), {
+      recursive: true,
+      force: true,
+    });
+    fs.rmSync(path.join(CODEX_PROMPTS_DIR, `${formatCodexPromptName(skillName)}.md`), {
+      force: true,
+    });
+  }
 }
 
 function resolveMarketplacePluginPath(pluginRoot) {
@@ -423,6 +555,7 @@ function runInstallHooks(pluginRoot) {
 function install(pluginRoot, skipHookInstall) {
   upsertMarketplaceEntry(pluginRoot);
   configureLocalPlugin();
+  installCodexSkillWrappers(pluginRoot);
   if (!skipHookInstall) {
     runInstallHooks(pluginRoot);
   }
@@ -432,6 +565,7 @@ function install(pluginRoot, skipHookInstall) {
 function uninstall(pluginRoot) {
   removeMarketplaceEntry(pluginRoot);
   removeLocalPluginConfig();
+  removeCodexSkillWrappers();
   removeManagedHooks(pluginRoot);
   removeManagedAgentFile();
   console.log(`Uninstalled ${PLUGIN_NAME} from ${pluginRoot}`);

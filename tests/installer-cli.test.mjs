@@ -40,6 +40,7 @@ function copyFixture(sourceRoot) {
     "internal-skills",
     "package.json",
     "scripts",
+    "skills",
   ];
 
   for (const relativePath of includePaths) {
@@ -95,12 +96,25 @@ describe("installer-cli", () => {
     const configFile = path.join(homeDir, ".codex", "config.toml");
     const hooksFile = path.join(homeDir, ".codex", "hooks.json");
     const agentFile = path.join(homeDir, ".codex", "agents", "cc-rescue.toml");
+    const codexSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
+    const codexPromptPath = path.join(homeDir, ".codex", "prompts", "cc-review.md");
 
     assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
+    assert.ok(fs.existsSync(codexSkillPath));
+    assert.ok(fs.existsSync(codexPromptPath));
 
     const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
     assert.equal(marketplace.plugins[0].name, "cc");
     assert.equal(marketplace.plugins[0].source.path, "./.codex/plugins/cc");
+
+    const codexSkill = fs.readFileSync(codexSkillPath, "utf8");
+    const codexPrompt = fs.readFileSync(codexPromptPath, "utf8");
+    assert.match(codexSkill, /^---\nname: cc:review\n/m);
+    assert.match(codexSkill, /Use the companion entrypoint at:/);
+    assert.match(codexSkill, /node ".*\/\.codex\/plugins\/cc\/scripts\/claude-companion\.mjs" review/);
+    assert.doesNotMatch(codexSkill, /two directories above this skill file/);
+    assert.doesNotMatch(codexSkill, /<plugin-root>/);
+    assert.match(codexPrompt, /Use the \$cc:review skill/);
 
     const config = fs.readFileSync(configFile, "utf8");
     assert.match(config, /\[plugins\."cc@local-plugins"\]/);
@@ -134,6 +148,8 @@ describe("installer-cli", () => {
     const expectedPath = `./${path.relative(homeDir, installDir).replace(/\\/g, "/")}`;
 
     assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
+    assert.ok(fs.existsSync(path.join(codexHome, "skills", "cc-review", "SKILL.md")));
+    assert.ok(fs.existsSync(path.join(codexHome, "prompts", "cc-review.md")));
     assert.equal(marketplace.plugins[0].source.path, expectedPath);
     assert.ok(expectedPath.includes(".."));
   });
@@ -212,6 +228,8 @@ describe("installer-cli", () => {
     const hooks = JSON.parse(fs.readFileSync(path.join(homeDir, ".codex", "hooks.json"), "utf8"));
 
     assert.ok(!fs.existsSync(installDir));
+    assert.ok(!fs.existsSync(path.join(homeDir, ".codex", "skills", "cc-review")));
+    assert.ok(!fs.existsSync(path.join(homeDir, ".codex", "prompts", "cc-review.md")));
     assert.equal(marketplace.plugins.length, 1);
     assert.equal(marketplace.plugins[0].name, "other");
     assert.match(config, /\[plugins\."github@openai-curated"\]/);

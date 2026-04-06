@@ -43,7 +43,7 @@ In addition to mirroring the upstream command surface, this repository adds a fe
 
 ## Install
 
-Choose either install path below. Both install the plugin into `~/.codex/plugins/cc`, create or update `~/.agents/plugins/marketplace.json`, enable `cc@local-plugins` in `~/.codex/config.toml`, enable `codex_hooks = true`, and install Codex hooks plus the global `cc-rescue` agent.
+Choose either install path below. Both install the plugin into `~/.codex/plugins/cc`, create or update `~/.agents/plugins/marketplace.json`, install Codex-native `cc-*` wrappers into `~/.codex/skills` and `~/.codex/prompts`, enable `cc@local-plugins` in `~/.codex/config.toml`, enable `codex_hooks = true`, and install Codex hooks plus the global `cc-rescue` agent.
 
 ### npx
 
