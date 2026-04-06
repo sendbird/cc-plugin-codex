@@ -1,4 +1,4 @@
-# cc-plugin-codex
+# Claude Code plugin for Codex
 
 Use Claude Code from inside Codex for reviews, delegated implementation work, and tracked background jobs.
 
