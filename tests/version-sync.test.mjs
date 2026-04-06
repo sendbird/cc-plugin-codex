@@ -30,7 +30,8 @@ function createTempRepo({ packageVersion, pluginVersion }) {
 
 describe("version sync", () => {
   it("asserts the live repo versions match", () => {
-    assert.equal(assertVersionsMatch(), "1.0.0");
+    const { packageVersion } = readVersionPair();
+    assert.equal(assertVersionsMatch(), packageVersion);
   });
 
   it("detects mismatched versions", () => {
