@@ -28,6 +28,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: npm ci
       - run: npm run check:version-sync
+      - run: npm run check:changelog
       - run: npm run check
       - run: npm pack --dry-run
       - run: npm publish

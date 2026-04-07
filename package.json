@@ -1,6 +1,6 @@
 {
   "name": "cc-plugin-codex",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Claude Code Plugin for Codex by Sendbird",
   "type": "module",
   "author": {
@@ -43,18 +43,19 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
+    "check:changelog": "node scripts/check-changelog.mjs",
     "check:version-sync": "node scripts/check-version-sync.mjs",
     "sync:plugin-version": "node scripts/sync-plugin-version.mjs",
-    "check": "npm run check:version-sync && npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run test:e2e",
+    "check": "npm run check:version-sync && npm run check:changelog && npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run test:e2e",
     "install:codex": "node scripts/installer-cli.mjs install",
-    "prepack": "npm run check:version-sync",
+    "prepack": "npm run check:version-sync && npm run check:changelog",
     "setup:git-hooks": "node scripts/setup-git-hooks.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
     "uninstall:codex": "node scripts/installer-cli.mjs uninstall",
     "update:codex": "node scripts/installer-cli.mjs update",
-    "version": "npm run sync:plugin-version && npm run check:version-sync"
+    "version": "npm run sync:plugin-version && npm run check:version-sync && npm run check:changelog"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
