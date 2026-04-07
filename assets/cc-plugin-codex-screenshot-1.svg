@@ -1,34 +1,248 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Claude Code Plugin for Codex screenshot">
-  <rect width="1440" height="900" fill="#0E1017"/>
-  <rect x="48" y="48" width="1344" height="804" rx="32" fill="#121521"/>
-  <rect x="80" y="80" width="1280" height="120" rx="24" fill="#0D0D0D"/>
-  <text x="120" y="138" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="44" font-weight="700" fill="#FFFFFF">Claude Code Plugin for Codex</text>
-  <text x="120" y="176" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="22" fill="#D9D9D9">Use Claude Code through the $cc skill surface for reviews, rescue tasks, and tracked job management.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Claude Code Plugin for Codex — feature overview">
+  <defs>
+    <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0E0E1A"/>
+      <stop offset="100%" stop-color="#08080F"/>
+    </linearGradient>
+    <linearGradient id="heroG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7B39FE" stop-opacity=".12"/>
+      <stop offset="100%" stop-color="#7B39FE" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="purpleG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B07BFF"/>
+      <stop offset="50%" stop-color="#7B39FE"/>
+      <stop offset="100%" stop-color="#6222E8"/>
+    </linearGradient>
+    <linearGradient id="pinkG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6BCC"/>
+      <stop offset="50%" stop-color="#E040FB"/>
+      <stop offset="100%" stop-color="#AA22DD"/>
+    </linearGradient>
+    <linearGradient id="cyanG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4DD9E8"/>
+      <stop offset="50%" stop-color="#00BCD4"/>
+      <stop offset="100%" stop-color="#0097A7"/>
+    </linearGradient>
+    <linearGradient id="ccIconG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B07BFF"/>
+      <stop offset="100%" stop-color="#7B39FE"/>
+    </linearGradient>
+    <filter id="cardSh" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <filter id="termSh" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="6" stdDeviation="16" flood-color="#000" flood-opacity=".4"/>
+    </filter>
+    <filter id="iconGl" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.48 0 0 0 0 0.22 0 0 0 0 0.99 0 0 0 0.4 0"/>
+    </filter>
+    <clipPath id="roundCard1"><rect x="64" y="228" width="416" height="310" rx="20"/></clipPath>
+    <clipPath id="roundCard2"><rect x="512" y="228" width="416" height="310" rx="20"/></clipPath>
+    <clipPath id="roundCard3"><rect x="960" y="228" width="416" height="310" rx="20"/></clipPath>
+  </defs>
 
-  <rect x="80" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
-  <rect x="80" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
-  <text x="112" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:review</text>
-  <text x="112" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Run a standard Claude Code review on the</text>
-  <text x="112" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">current working tree or branch diff.</text>
-  <text x="112" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --wait, --background, --base, --scope, --model</text>
+  <!-- Background -->
+  <rect width="1440" height="900" fill="url(#bgG)"/>
 
-  <rect x="520" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
-  <rect x="520" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
-  <text x="552" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:adversarial-review</text>
-  <text x="552" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Challenge design choices, assumptions, and</text>
-  <text x="552" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">tradeoffs before you ship.</text>
-  <text x="552" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --wait, --background, --base, --scope, --model, [focus]</text>
+  <!-- Subtle grid -->
+  <g opacity=".03">
+    <line x1="360" y1="0" x2="360" y2="900" stroke="#7B39FE" stroke-width="1"/>
+    <line x1="720" y1="0" x2="720" y2="900" stroke="#7B39FE" stroke-width="1"/>
+    <line x1="1080" y1="0" x2="1080" y2="900" stroke="#7B39FE" stroke-width="1"/>
+    <line x1="0" y1="225" x2="1440" y2="225" stroke="#7B39FE" stroke-width="1"/>
+    <line x1="0" y1="450" x2="1440" y2="450" stroke="#7B39FE" stroke-width="1"/>
+    <line x1="0" y1="675" x2="1440" y2="675" stroke="#7B39FE" stroke-width="1"/>
+  </g>
 
-  <rect x="960" y="240" width="400" height="252" rx="24" fill="#171B2A"/>
-  <rect x="960" y="240" width="400" height="12" rx="6" fill="#7B39FE"/>
-  <text x="992" y="302" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">$cc:rescue</text>
-  <text x="992" y="344" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">Delegate substantial implementation or</text>
-  <text x="992" y="374" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">debugging work to Claude Code.</text>
-  <text x="992" y="432" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Args: --background, --wait, --resume, --write, --model, --effort</text>
+  <!-- Hero gradient overlay -->
+  <rect width="1440" height="210" fill="url(#heroG)"/>
 
-  <rect x="80" y="544" width="1280" height="252" rx="24" fill="#171B2A"/>
-  <text x="112" y="608" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">Tracked jobs and follow-up skills</text>
-  <text x="112" y="652" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="21" fill="#D9D9D9">$cc:status shows live progress, $cc:result returns stored output, and $cc:cancel stops active jobs.</text>
-  <text x="112" y="708" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Marketplace-ready metadata includes Sendbird publisher info, legal links, install copy, and visual assets.</text>
-  <text x="112" y="752" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="18" fill="#FFFFFF">Repository: github.com/sendbird/cc-plugin-codex</text>
+  <!-- ============ HERO SECTION ============ -->
+
+  <!-- Mini CC icon -->
+  <g transform="translate(64, 52)">
+    <rect width="72" height="72" rx="16" fill="#14142A"/>
+    <rect x=".5" y=".5" width="71" height="71" rx="15.5" fill="none" stroke="#7B39FE" stroke-opacity=".2"/>
+    <g filter="url(#iconGl)">
+      <circle cx="23" cy="33" r="13" fill="none" stroke="#7B39FE" stroke-width="6"
+        stroke-dasharray="59 23" transform="rotate(48 23 33)" stroke-linecap="round"/>
+      <circle cx="49" cy="33" r="13" fill="none" stroke="#7B39FE" stroke-width="6"
+        stroke-dasharray="59 23" transform="rotate(48 49 33)" stroke-linecap="round"/>
+    </g>
+    <circle cx="23" cy="33" r="13" fill="none" stroke="url(#ccIconG)" stroke-width="6"
+      stroke-dasharray="59 23" transform="rotate(48 23 33)" stroke-linecap="round"/>
+    <circle cx="49" cy="33" r="13" fill="none" stroke="url(#ccIconG)" stroke-width="6"
+      stroke-dasharray="59 23" transform="rotate(48 49 33)" stroke-linecap="round"/>
+  </g>
+
+  <!-- Title -->
+  <text x="152" y="82" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="38" font-weight="700" fill="#FFFFFF">Claude Code</text>
+  <text x="152" y="116" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="20" fill="#8888AA" letter-spacing="1">Plugin for Codex</text>
+
+  <!-- Tagline -->
+  <text x="64" y="172" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="24" fill="#B0B0C8">Delegate code reviews, design challenges, and rescue tasks from Codex to Claude Code.</text>
+
+  <!-- Badges -->
+  <g transform="translate(990, 64)">
+    <rect width="120" height="36" rx="18" fill="#7B39FE" fill-opacity=".12" stroke="#7B39FE" stroke-opacity=".3" stroke-width="1"/>
+    <text x="60" y="23" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#B07BFF">Interactive</text>
+  </g>
+  <g transform="translate(1122, 64)">
+    <rect width="90" height="36" rx="18" fill="#7B39FE" fill-opacity=".12" stroke="#7B39FE" stroke-opacity=".3" stroke-width="1"/>
+    <text x="45" y="23" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#B07BFF">Write</text>
+  </g>
+  <g transform="translate(1224, 64)">
+    <rect width="152" height="36" rx="18" fill="#7B39FE" fill-opacity=".12" stroke="#7B39FE" stroke-opacity=".3" stroke-width="1"/>
+    <text x="76" y="23" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#B07BFF">Apache-2.0</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="64" y1="210" x2="1376" y2="210" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="1"/>
+
+  <!-- ============ FEATURE CARDS ============ -->
+
+  <!-- Card 1: $cc:review -->
+  <g filter="url(#cardSh)">
+    <rect x="64" y="228" width="416" height="310" rx="20" fill="#12122A"/>
+  </g>
+  <rect x="64" y="228" width="416" height="310" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="1"/>
+  <!-- Accent bar -->
+  <rect x="64" y="228" width="416" height="5" rx="2.5" fill="url(#purpleG)" clip-path="url(#roundCard1)"/>
+
+  <!-- Review icon: magnifying glass -->
+  <g transform="translate(96, 262)">
+    <circle cx="20" cy="20" r="14" fill="none" stroke="#7B39FE" stroke-width="3"/>
+    <line x1="30" y1="30" x2="40" y2="40" stroke="#7B39FE" stroke-width="3" stroke-linecap="round"/>
+    <path d="M16 16l8 8" stroke="#7B39FE" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+  </g>
+  <text x="150" y="290" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="28" font-weight="700" fill="#FFFFFF">$cc:review</text>
+
+  <text x="96" y="336" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">Run a standard Claude Code review on</text>
+  <text x="96" y="360" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">your current working tree or branch diff.</text>
+  <text x="96" y="388" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#8888AA">Read-only. Safe to run anytime.</text>
+
+  <!-- Example usage -->
+  <rect x="88" y="420" width="368" height="36" rx="8" fill="#0A0A18"/>
+  <text x="104" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#7B39FE">$</text>
+  <text x="118" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#D0D0E0">$cc:review --base main</text>
+
+  <!-- Usage args -->
+  <text x="96" y="494" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="12" fill="#666680">--wait  --background  --base  --scope  --model</text>
+
+  <!-- Card 2: $cc:adversarial-review -->
+  <g filter="url(#cardSh)">
+    <rect x="512" y="228" width="416" height="310" rx="20" fill="#12122A"/>
+  </g>
+  <rect x="512" y="228" width="416" height="310" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="1"/>
+  <rect x="512" y="228" width="416" height="5" rx="2.5" fill="url(#pinkG)" clip-path="url(#roundCard2)"/>
+
+  <!-- Adversarial icon: shield with exclamation -->
+  <g transform="translate(544, 262)">
+    <path d="M20 4L4 12v12c0 11 7 21 16 24 9-3 16-13 16-24V12z" fill="none" stroke="#E040FB" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="20" y1="18" x2="20" y2="28" stroke="#E040FB" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="20" cy="33" r="1.5" fill="#E040FB"/>
+  </g>
+  <text x="598" y="290" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="24" font-weight="700" fill="#FFFFFF">$cc:adversarial-review</text>
+
+  <text x="544" y="336" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">Challenge design choices, assumptions,</text>
+  <text x="544" y="360" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">and tradeoffs before you ship.</text>
+  <text x="544" y="388" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#8888AA">Steerable focus. Read-only.</text>
+
+  <rect x="536" y="420" width="368" height="36" rx="8" fill="#0A0A18"/>
+  <text x="552" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#E040FB">$</text>
+  <text x="566" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#D0D0E0">$cc:adversarial-review</text>
+
+  <text x="544" y="494" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="12" fill="#666680">--wait  --background  --base  --scope  --model  [focus]</text>
+
+  <!-- Card 3: $cc:rescue -->
+  <g filter="url(#cardSh)">
+    <rect x="960" y="228" width="416" height="310" rx="20" fill="#12122A"/>
+  </g>
+  <rect x="960" y="228" width="416" height="310" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="1"/>
+  <rect x="960" y="228" width="416" height="5" rx="2.5" fill="url(#cyanG)" clip-path="url(#roundCard3)"/>
+
+  <!-- Rescue icon: wrench -->
+  <g transform="translate(992, 262)">
+    <path d="M32 8a14 14 0 0 0-18 18l-8 8 6 6 8-8a14 14 0 0 0 18-18l-6 6-4 0 0-4z" fill="none" stroke="#00BCD4" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <text x="1046" y="290" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="28" font-weight="700" fill="#FFFFFF">$cc:rescue</text>
+
+  <text x="992" y="336" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">Delegate substantial implementation or</text>
+  <text x="992" y="360" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#B0B0C8">debugging work to Claude Code.</text>
+  <text x="992" y="388" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="17" fill="#8888AA">Writable. Tracked background jobs.</text>
+
+  <rect x="984" y="420" width="368" height="36" rx="8" fill="#0A0A18"/>
+  <text x="1000" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#00BCD4">$</text>
+  <text x="1014" y="444" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#D0D0E0">$cc:rescue fix the failing test</text>
+
+  <text x="992" y="494" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="12" fill="#666680">--background  --wait  --resume  --write  --model  --effort</text>
+
+  <!-- ============ TERMINAL DEMO ============ -->
+
+  <g filter="url(#termSh)">
+    <rect x="64" y="570" width="1312" height="260" rx="16" fill="#0D1117"/>
+  </g>
+  <rect x="64" y="570" width="1312" height="260" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity=".08" stroke-width="1"/>
+
+  <!-- Terminal title bar -->
+  <rect x="64" y="570" width="1312" height="40" rx="16" fill="#161B22"/>
+  <rect x="64" y="594" width="1312" height="16" fill="#161B22"/>
+  <!-- Traffic lights -->
+  <circle cx="92" cy="590" r="6" fill="#FF5F57"/>
+  <circle cx="112" cy="590" r="6" fill="#FEBC2E"/>
+  <circle cx="132" cy="590" r="6" fill="#28C840"/>
+  <text x="720" y="595" text-anchor="middle" font-family="SF Mono, Menlo, monospace" font-size="13" fill="#8B949E">Terminal — Typical Workflow</text>
+
+  <!-- Terminal content -->
+  <!-- Line 1: review command -->
+  <text x="96" y="640" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#7B39FE">&#x276F;</text>
+  <text x="116" y="640" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#E6EDF3">$cc:review --background</text>
+  <!-- Line 2: output -->
+  <text x="116" y="666" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#3FB950">&#x2713;</text>
+  <text x="136" y="666" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#8B949E">Background job started:</text>
+  <text x="370" y="666" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#58A6FF">task-a1b2c3</text>
+
+  <!-- Line 3: status command -->
+  <text x="96" y="700" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#7B39FE">&#x276F;</text>
+  <text x="116" y="700" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#E6EDF3">$cc:status</text>
+  <!-- Line 4: status output -->
+  <text x="116" y="726" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#FFA657">&#x25CF;</text>
+  <text x="136" y="726" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#8B949E">task-a1b2c3</text>
+  <text x="272" y="726" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#B07BFF">review</text>
+  <text x="344" y="726" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#FFA657">running</text>
+  <text x="432" y="726" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#8B949E">45s</text>
+
+  <!-- Line 5: result command -->
+  <text x="96" y="760" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#7B39FE">&#x276F;</text>
+  <text x="116" y="760" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#E6EDF3">$cc:result</text>
+  <!-- Line 6: result output -->
+  <text x="116" y="786" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#3FB950">&#x2713;</text>
+  <text x="136" y="786" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#8B949E">Review complete.</text>
+  <text x="304" y="786" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#E6EDF3">3 findings</text>
+  <text x="404" y="786" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="15" fill="#8B949E">across 5 files.</text>
+
+  <!-- Right side of terminal: additional commands info -->
+  <line x1="720" y1="624" x2="720" y2="804" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="1"/>
+
+  <text x="760" y="648" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="16" font-weight="600" fill="#B0B0C8">Job management</text>
+
+  <text x="760" y="684" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#7B39FE">$cc:status</text>
+  <text x="920" y="684" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="14" fill="#666680">Live progress of running jobs</text>
+
+  <text x="760" y="714" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#7B39FE">$cc:result</text>
+  <text x="920" y="714" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="14" fill="#666680">Stored output from finished jobs</text>
+
+  <text x="760" y="744" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#7B39FE">$cc:cancel</text>
+  <text x="920" y="744" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="14" fill="#666680">Stop an active background job</text>
+
+  <text x="760" y="774" font-family="SF Mono, Fira Code, Menlo, monospace" font-size="14" fill="#7B39FE">$cc:setup</text>
+  <text x="920" y="774" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="14" fill="#666680">Verify install and review-gate state</text>
+
+  <!-- ============ FOOTER ============ -->
+  <text x="64" y="870" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="15" fill="#555570">Built by</text>
+  <text x="132" y="870" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#8888AA">Sendbird</text>
+  <text x="220" y="870" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="15" fill="#333348">|</text>
+  <text x="240" y="870" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="15" fill="#555570">github.com/sendbird/cc-plugin-codex</text>
+  <text x="1376" y="870" text-anchor="end" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="15" fill="#555570">Apache-2.0</text>
 </svg>

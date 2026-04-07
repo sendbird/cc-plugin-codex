@@ -1,7 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Claude Code Plugin for Codex logo">
-  <rect width="512" height="512" rx="96" fill="#0D0D0D"/>
-  <rect x="32" y="32" width="448" height="448" rx="72" fill="#7B39FE" opacity="0.12"/>
-  <path d="M172 155c-47 0-83 40-83 101s36 101 83 101c23 0 43-8 60-25l-33-32c-7 7-15 11-27 11-23 0-39-21-39-55s16-55 39-55c12 0 20 4 27 11l33-32c-17-17-37-25-60-25zm168 0c-47 0-83 40-83 101s36 101 83 101c23 0 43-8 60-25l-33-32c-7 7-15 11-27 11-23 0-39-21-39-55s16-55 39-55c12 0 20 4 27 11l33-32c-17-17-37-25-60-25z" fill="#FFFFFF"/>
-  <text x="256" y="412" text-anchor="middle" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="34" font-weight="700" fill="#FFFFFF">Claude Code</text>
-  <text x="256" y="448" text-anchor="middle" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="22" fill="#D9D9D9">Plugin for Codex</text>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#1A1A30"/>
+      <stop offset="100%" stop-color="#0A0A14"/>
+    </radialGradient>
+    <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B07BFF"/>
+      <stop offset="50%" stop-color="#7B39FE"/>
+      <stop offset="100%" stop-color="#6222E8"/>
+    </linearGradient>
+    <linearGradient id="tg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D8D0F0"/>
+    </linearGradient>
+    <filter id="gl" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.48 0 0 0 0 0.22 0 0 0 0 0.99 0 0 0 0.35 0"/>
+    </filter>
+    <filter id="ts" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.48 0 0 0 0 0.22 0 0 0 0 0.99 0 0 0 0.3 0"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <rect x="1" y="1" width="510" height="510" rx="95" fill="none" stroke="#7B39FE" stroke-opacity=".12"/>
+
+  <!-- Subtle decorative ring -->
+  <circle cx="256" cy="200" r="130" fill="none" stroke="#7B39FE" stroke-opacity=".06" stroke-width="1"/>
+  <circle cx="256" cy="200" r="145" fill="none" stroke="#7B39FE" stroke-opacity=".04" stroke-width="1"/>
+
+  <!-- Glow layer -->
+  <g filter="url(#gl)">
+    <circle cx="160" cy="200" r="82" fill="none" stroke="#7B39FE" stroke-width="38"
+      stroke-dasharray="373 142" transform="rotate(48 160 200)" stroke-linecap="round"/>
+    <circle cx="352" cy="200" r="82" fill="none" stroke="#7B39FE" stroke-width="38"
+      stroke-dasharray="373 142" transform="rotate(48 352 200)" stroke-linecap="round"/>
+  </g>
+
+  <!-- Sharp CC monogram -->
+  <circle cx="160" cy="200" r="82" fill="none" stroke="url(#cg)" stroke-width="38"
+    stroke-dasharray="373 142" transform="rotate(48 160 200)" stroke-linecap="round"/>
+  <circle cx="352" cy="200" r="82" fill="none" stroke="url(#cg)" stroke-width="38"
+    stroke-dasharray="373 142" transform="rotate(48 352 200)" stroke-linecap="round"/>
+
+  <!-- Bridge dots -->
+  <circle cx="248" cy="200" r="6" fill="#7B39FE" opacity=".5"/>
+  <circle cx="264" cy="200" r="6" fill="#7B39FE" opacity=".5"/>
+
+  <!-- Text with subtle glow -->
+  <g filter="url(#ts)">
+    <text x="256" y="370" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="52" font-weight="700" fill="#FFFFFF">Claude Code</text>
+  </g>
+  <text x="256" y="370" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="52" font-weight="700" fill="url(#tg)">Claude Code</text>
+
+  <text x="256" y="416" text-anchor="middle" font-family="Inter, SF Pro Display, -apple-system, system-ui, sans-serif" font-size="30" font-weight="400" fill="#8888AA" letter-spacing="2">Plugin for Codex</text>
+
+  <!-- Subtle bottom accent line -->
+  <line x1="180" y1="445" x2="332" y2="445" stroke="url(#cg)" stroke-width="2" stroke-linecap="round" opacity=".3"/>
 </svg>
