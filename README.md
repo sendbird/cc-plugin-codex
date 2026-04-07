@@ -2,7 +2,7 @@
 
 Use Claude Code from inside Codex.
 
-`cc-plugin-codex` is an open-source Codex plugin for Claude-powered review, rescue, and tracked background workflows.
+`cc-plugin-codex` is an open-source plugin that runs inside Codex and lets you use Claude Code and Claude models for review, rescue, and tracked background workflows.
 
 This repository is maintained by Sendbird and follows the overall shape of [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc), but in the opposite direction: Codex hosts the plugin and delegates work to Claude Code.
 
