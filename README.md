@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <code>cc-plugin-codex</code> runs inside Codex and lets you use Claude Code and Claude models for review, rescue, and tracked background workflows.
+</p>
+
+<p align="center">
   <a href="#quick-start"><strong>Quick Start</strong></a> ·
   <a href="#commands"><strong>Commands</strong></a> ·
   <a href="#background-jobs"><strong>Background Jobs</strong></a> ·
