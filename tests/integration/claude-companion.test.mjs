@@ -888,6 +888,75 @@ describe("claude-companion integration", () => {
     }
   });
 
+  it("uses an explicit owner session id so background review jobs stay visible to the parent session", async () => {
+    const testEnv = createTestEnvironment();
+    const childSessionEnv = {
+      ...testEnv.env,
+      [SESSION_ID_ENV]: "child-review-session",
+    };
+
+    try {
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+      writeCurrentSessionMarker(testEnv, "parent-review-session");
+
+      const launch = await runCompanionAsyncJson(
+        [
+          "review",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--background",
+          "--json",
+          "--scope",
+          "working-tree",
+          "--owner-session-id",
+          "parent-review-session",
+        ],
+        { env: childSessionEnv }
+      );
+      await waitForTerminalStatus(testEnv, launch.jobId, childSessionEnv);
+
+      const storedJob = readStoredJobById(testEnv, launch.jobId);
+      assert.equal(storedJob.sessionId, "parent-review-session");
+
+      const statusPayload = runCompanionJson(
+        ["status", "--cwd", testEnv.workspaceDir, "--json"],
+        { env: testEnv.env }
+      );
+      assert.equal(statusPayload.latestFinished?.id, launch.jobId);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("rejects invalid owner session ids before creating a background review job", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+
+      const result = runCompanionExpectFailure(
+        [
+          "review",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--background",
+          "--json",
+          "--scope",
+          "working-tree",
+          "--owner-session-id",
+          "invalid session id",
+        ],
+        { env: testEnv.env }
+      );
+
+      assert.match(result.stderr, /Invalid session ID/);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
   it("keeps completed resume candidates session-scoped and ignores active tasks", async () => {
     const testEnv = createTestEnvironment();
     const sessionAEnv = {

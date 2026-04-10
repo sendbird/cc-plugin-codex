@@ -7,10 +7,12 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 
 import { isProbablyText } from "./fs.mjs";
-import { runCommand, runCommandChecked } from "./process.mjs";
+import { formatCommandFailure, runCommand, runCommandChecked } from "./process.mjs";
 
 const MAX_UNTRACKED_BYTES = 24 * 1024;
 const MAX_INLINE_REVIEW_DIFF_BYTES = 64 * 1024;
+const REVIEW_DIFF_READ_MAX_BUFFER = MAX_INLINE_REVIEW_DIFF_BYTES + 8 * 1024;
+const HASH_OBJECT_BATCH_SIZE = 128;
 
 function git(cwd, args, options = {}) {
   return runCommand("git", args, { cwd, ...options });
@@ -109,17 +111,16 @@ function buildUntrackedMetadataFingerprint(repoRoot, relativePaths) {
 
 export function getWorkingTreeFingerprint(cwd) {
   const repoRoot = getRepoRoot(cwd);
-  const stagedDiff = gitChecked(repoRoot, [
+  const stagedDiffHash = gitChecked(repoRoot, ["write-tree"]).stdout.trim();
+  const unstaged = gitChecked(repoRoot, [
     "diff",
-    "--cached",
+    "--name-only",
     "--no-ext-diff",
-    "--submodule=diff",
-  ]).stdout;
-  const unstagedDiff = gitChecked(repoRoot, [
-    "diff",
-    "--no-ext-diff",
-    "--submodule=diff",
-  ]).stdout;
+    "-z",
+  ]).stdout
+    .split("\0")
+    .filter(Boolean)
+    .sort();
   const untracked = gitChecked(repoRoot, [
     "ls-files",
     "--others",
@@ -130,8 +131,7 @@ export function getWorkingTreeFingerprint(cwd) {
     .filter(Boolean)
     .sort();
 
-  const stagedDiffHash = hashText(stagedDiff);
-  const unstagedDiffHash = hashText(unstagedDiff);
+  const unstagedDiffHash = hashWorkingTreePaths(repoRoot, unstaged);
   const untrackedFingerprintHash = buildUntrackedMetadataFingerprint(
     repoRoot,
     untracked
@@ -153,6 +153,75 @@ export function getWorkingTreeFingerprint(cwd) {
     untrackedCount: untracked.length,
     signature,
   };
+}
+
+function hashWorkingTreePaths(repoRoot, relativePaths) {
+  const hash = createHash("sha256");
+  const regularPaths = [];
+
+  for (const relativePath of relativePaths) {
+    hash.update(relativePath, "utf8");
+    hash.update("\0", "utf8");
+
+    const absolutePath = path.join(repoRoot, relativePath);
+    try {
+      const stat = fs.lstatSync(absolutePath);
+      if (stat.isDirectory()) {
+        hash.update("directory", "utf8");
+        hash.update("\0", "utf8");
+        hash.update(String(Math.trunc(stat.mtimeMs)), "utf8");
+        hash.update("\0", "utf8");
+        continue;
+      }
+
+      if (stat.isSymbolicLink()) {
+        hash.update("symlink", "utf8");
+        hash.update("\0", "utf8");
+        hash.update(fs.readlinkSync(absolutePath), "utf8");
+        hash.update("\0", "utf8");
+        continue;
+      }
+
+      regularPaths.push(relativePath);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        hash.update("deleted", "utf8");
+      } else {
+        throw error;
+      }
+    }
+    hash.update("\0", "utf8");
+  }
+
+  const blobHashes = readBlobHashes(repoRoot, regularPaths);
+  for (const relativePath of regularPaths) {
+    hash.update(blobHashes.get(relativePath), "utf8");
+    hash.update("\0", "utf8");
+  }
+
+  return hash.digest("hex");
+}
+
+function readBlobHashes(repoRoot, relativePaths) {
+  const hashes = new Map();
+  for (let index = 0; index < relativePaths.length; index += HASH_OBJECT_BATCH_SIZE) {
+    const batch = relativePaths.slice(index, index + HASH_OBJECT_BATCH_SIZE);
+    const stdout = gitChecked(repoRoot, ["hash-object", "--no-filters", "--", ...batch]).stdout;
+    const digestLines = stdout
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (digestLines.length !== batch.length) {
+      throw new Error(
+        `git hash-object returned ${digestLines.length} hashes for ${batch.length} path(s).`
+      );
+    }
+    batch.forEach((relativePath, batchIndex) => {
+      hashes.set(relativePath, digestLines[batchIndex]);
+    });
+  }
+  return hashes;
 }
 
 export function resolveReviewTarget(cwd, options = {}) {
@@ -259,25 +328,44 @@ function shouldInlineReviewDiff(...sections) {
   return true;
 }
 
+function readBoundedGitDiff(cwd, args) {
+  const result = git(cwd, args, { maxBuffer: REVIEW_DIFF_READ_MAX_BUFFER });
+  if (result.error) {
+    if (result.error.code === "ENOBUFS") {
+      return { text: "", tooLarge: true };
+    }
+    throw new Error(
+      `${result.command} ${result.args.join(" ")}: ${result.error.message}`
+    );
+  }
+  if (result.status !== 0) {
+    throw new Error(formatCommandFailure(result));
+  }
+  return { text: result.stdout, tooLarge: false };
+}
+
 function collectWorkingTreeContext(cwd, state) {
   const status = gitChecked(cwd, ["status", "--short"]).stdout.trim();
-  const stagedDiff = gitChecked(cwd, ["diff", "--cached", "--no-ext-diff", "--submodule=diff"]).stdout;
-  const unstagedDiff = gitChecked(cwd, ["diff", "--no-ext-diff", "--submodule=diff"]).stdout;
   const untrackedBody = state.untracked.map((file) => formatUntrackedFile(cwd, file)).join("\n\n");
-  const inlineDiffs = shouldInlineReviewDiff(status, stagedDiff, unstagedDiff, untrackedBody);
+  const stagedDiff = readBoundedGitDiff(cwd, ["diff", "--cached", "--no-ext-diff", "--submodule=diff"]);
+  const unstagedDiff = readBoundedGitDiff(cwd, ["diff", "--no-ext-diff", "--submodule=diff"]);
+  const inlineDiffs =
+    !stagedDiff.tooLarge &&
+    !unstagedDiff.tooLarge &&
+    shouldInlineReviewDiff(status, stagedDiff.text, unstagedDiff.text, untrackedBody);
 
   const parts = [
     formatSection("Git Status", status),
     formatSection(
       "Staged Diff",
       inlineDiffs
-        ? stagedDiff
+        ? stagedDiff.text
         : "Large diff omitted. Inspect staged changes directly with read-only git commands such as `git diff --cached --no-ext-diff --submodule=diff`."
     ),
     formatSection(
       "Unstaged Diff",
       inlineDiffs
-        ? unstagedDiff
+        ? unstagedDiff.text
         : "Large diff omitted. Inspect unstaged changes directly with read-only git commands such as `git diff --no-ext-diff --submodule=diff`."
     ),
     formatSection("Untracked Files", untrackedBody)
@@ -296,8 +384,10 @@ function collectBranchContext(cwd, baseRef) {
   const currentBranch = getCurrentBranch(cwd);
   const logOutput = gitChecked(cwd, ["log", "--oneline", "--decorate", commitRange]).stdout.trim();
   const diffStat = gitChecked(cwd, ["diff", "--stat", commitRange]).stdout.trim();
-  const diff = gitChecked(cwd, ["diff", "--no-ext-diff", "--submodule=diff", commitRange]).stdout;
-  const inlineDiff = shouldInlineReviewDiff(logOutput, diffStat, diff);
+  const diff = readBoundedGitDiff(cwd, ["diff", "--no-ext-diff", "--submodule=diff", commitRange]);
+  const inlineDiff =
+    !diff.tooLarge &&
+    shouldInlineReviewDiff(logOutput, diffStat, diff.text);
 
   return {
     mode: "branch",
@@ -308,7 +398,7 @@ function collectBranchContext(cwd, baseRef) {
       formatSection(
         "Branch Diff",
         inlineDiff
-          ? diff
+          ? diff.text
           : `Large diff omitted. Inspect the branch diff directly with read-only git commands such as \`git diff --no-ext-diff --submodule=diff ${commitRange}\`.`
       )
     ].join("\n")

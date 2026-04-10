@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.5
+
+- Keep built-in background review jobs attached to the parent Codex session so plain `$cc:status` and `$cc:result` stay intuitive after nested rescue/review flows.
+- Make `$cc:status --all` show the full job history for the current repository workspace instead of staying session-scoped.
+- Harden large-diff review and hook fingerprinting so oversized `git diff` output degrades cleanly instead of failing with `ENOBUFS`.
+- Clarify README guidance around review visibility, large diffs, and the difference between session-scoped status and repository-wide status.
+
 ## v1.0.4
 
 - Make background built-in rescue/review completions steer users to `$cc:result <job-id>` instead of inlining raw child output.

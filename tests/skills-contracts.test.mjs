@@ -27,6 +27,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /For background review, use Codex's built-in `default` subagent/i);
   assert.match(review, /review-reserve-job --json/i);
   assert.match(review, /internal `--job-id <reserved-job-id>` routing flag/i);
+  assert.match(review, /internal `--owner-session-id <parent-session-id>` routing flag/i);
   assert.match(review, /spawn_agent/i);
   assert.match(review, /`fork_context: false`/i);
   assert.match(review, /`model: "gpt-5\.4-mini"`/i);
@@ -35,6 +36,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /Only consider `fork_context: true` as a last resort/i);
   assert.match(review, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(review, /review --view-state defer/i);
+  assert.match(review, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
   assert.match(review, /Background Claude Code review finished\. Open it with \$cc:result <reserved-job-id>\./i);
   assert.match(review, /use these steering messages instead of embedding the raw review result in the notification/i);
   assert.match(review, /do not embed the raw Claude result inside the notification message/i);
@@ -51,6 +53,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /For background adversarial review, use Codex's built-in `default` subagent/i);
   assert.match(adversarial, /review-reserve-job --json/i);
   assert.match(adversarial, /internal `--job-id <reserved-job-id>` routing flag/i);
+  assert.match(adversarial, /internal `--owner-session-id <parent-session-id>` routing flag/i);
   assert.match(adversarial, /spawn_agent/i);
   assert.match(adversarial, /`fork_context: false`/i);
   assert.match(adversarial, /`model: "gpt-5\.4-mini"`/i);
@@ -59,6 +62,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /Only consider `fork_context: true` as a last resort/i);
   assert.match(adversarial, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(adversarial, /adversarial-review --view-state defer/i);
+  assert.match(adversarial, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
   assert.match(adversarial, /Background Claude Code adversarial review finished\. Open it with \$cc:result <reserved-job-id>\./i);
   assert.match(adversarial, /use these steering messages instead of embedding the raw review result in the notification/i);
   assert.match(adversarial, /do not embed the raw Claude result inside the notification message/i);

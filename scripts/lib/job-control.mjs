@@ -156,10 +156,12 @@ export function buildStatusSnapshot(cwd, options = {}) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const config = getConfig(workspaceRoot);
   const jobs = sortJobsNewestFirst(
-    filterJobsForCurrentSession(listJobs(workspaceRoot), {
-      ...options,
-      cwd: workspaceRoot,
-    })
+    options.all
+      ? listJobs(workspaceRoot)
+      : filterJobsForCurrentSession(listJobs(workspaceRoot), {
+          ...options,
+          cwd: workspaceRoot,
+        })
   );
   const maxJobs = options.maxJobs ?? DEFAULT_MAX_STATUS_JOBS;
   const maxProgressLines = options.maxProgressLines ?? DEFAULT_MAX_PROGRESS_LINES;

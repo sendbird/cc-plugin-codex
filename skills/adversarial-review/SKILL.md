@@ -58,6 +58,7 @@ Background flow:
 - Before spawning the built-in child, reserve a review job id by running:
   `node "<plugin-root>/scripts/claude-companion.mjs" review-reserve-job --json`
 - If that helper returns a non-empty `jobId`, pass it into the companion command as an internal `--job-id <reserved-job-id>` routing flag.
+- Add an internal `--owner-session-id <parent-session-id>` routing flag when spawning the built-in child so the tracked review job stays visible in the parent Codex session's plain `$cc:status`.
 - If the built-in review is running in background, the parent should first capture its own thread id by running:
   `node -e "process.stdout.write(process.env.CODEX_THREAD_ID || '')"`
 - If that command returns a non-empty thread id, pass it into the child prompt as the parent thread id for one-shot completion notification.
@@ -76,6 +77,7 @@ Background flow:
   - run exactly one shell command
   - execute:
     `node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review --view-state defer <arguments with --wait/--background removed>`
+  - include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session
   - include `--job-id <reserved-job-id>` when the parent reserved one
   - return only that command's stdout exactly, with no added commentary
   - ignore stderr progress chatter such as `[cc] ...` lines and preserve only the final stdout-equivalent result text

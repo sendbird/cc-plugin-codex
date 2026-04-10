@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { collectReviewContext } from "../scripts/lib/git.mjs";
+import { collectReviewContext, getWorkingTreeFingerprint } from "../scripts/lib/git.mjs";
 
 const tempRepos = [];
 
@@ -147,5 +147,44 @@ describe("collectReviewContext", () => {
     assert.match(context.content, /Large diff omitted\./);
     assert.match(context.content, /git diff --no-ext-diff --submodule=diff/);
     assert.doesNotMatch(context.content, /@@/);
+  });
+
+  it("degrades gracefully when working-tree diff output exceeds the process buffer", () => {
+    const repo = createRepo();
+    const hugeText = `${"z".repeat(2048)}\n`.repeat(700);
+
+    fs.writeFileSync(path.join(repo, "app.js"), "export const value = 1;\n", "utf8");
+    runGit(repo, ["add", "app.js"]);
+    runGit(repo, ["commit", "-m", "initial"]);
+
+    fs.writeFileSync(path.join(repo, "app.js"), hugeText, "utf8");
+
+    const context = collectReviewContext(repo, {
+      mode: "working-tree",
+      label: "working tree diff",
+      explicit: true,
+    });
+
+    assert.match(context.content, /Large diff omitted\./);
+    assert.match(context.content, /git diff --cached --no-ext-diff --submodule=diff/);
+    assert.match(context.content, /git diff --no-ext-diff --submodule=diff/);
+  });
+
+  it("computes a working-tree fingerprint without buffering the full diff text", () => {
+    const repo = createRepo();
+    const hugeText = `${"w".repeat(2048)}\n`.repeat(700);
+
+    fs.writeFileSync(path.join(repo, "app.js"), "export const value = 1;\n", "utf8");
+    runGit(repo, ["add", "app.js"]);
+    runGit(repo, ["commit", "-m", "initial"]);
+
+    fs.writeFileSync(path.join(repo, "app.js"), hugeText, "utf8");
+
+    const fingerprint = getWorkingTreeFingerprint(repo);
+
+    assert.equal(typeof fingerprint.signature, "string");
+    assert.equal(fingerprint.signature.length > 0, true);
+    assert.equal(typeof fingerprint.stagedDiffHash, "string");
+    assert.equal(typeof fingerprint.unstagedDiffHash, "string");
   });
 });

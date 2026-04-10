@@ -176,6 +176,12 @@ function resolveExplicitJobId(value, workspaceRoot) {
   return explicitJobId;
 }
 
+function resolveOwnerSessionId(value) {
+  const trimmed = value == null ? "" : String(value).trim();
+  if (!trimmed) return null;
+  return sanitizeId(trimmed, "session ID");
+}
+
 async function withReleasedReservation(workspaceRoot, explicitJobId, fn) {
   try {
     return await fn();
@@ -1099,7 +1105,7 @@ async function resolveLatestResumableSession(cwd, options = {}) {
 
 async function handleReviewCommand(argv, config) {
   const { options, positionals } = parseCommandInput(argv, {
-    valueOptions: ["base", "scope", "model", "cwd", "view-state", "job-id"],
+    valueOptions: ["base", "scope", "model", "cwd", "view-state", "job-id", "owner-session-id"],
     booleanOptions: ["json", "background", "wait"],
     aliasMap: {
       m: "model"
@@ -1115,6 +1121,7 @@ async function handleReviewCommand(argv, config) {
     scope: options.scope
   });
   const explicitJobId = resolveExplicitJobId(options["job-id"], workspaceRoot);
+  const ownerSessionId = resolveOwnerSessionId(options["owner-session-id"]);
   const markViewedOnSuccess = resolveMarkViewedOnSuccess(
     options["view-state"],
     Boolean(options.background)
@@ -1132,6 +1139,7 @@ async function handleReviewCommand(argv, config) {
       workspaceRoot,
       jobClass: "review",
       summary: metadata.summary,
+      sessionId: ownerSessionId,
       explicitJobId
     });
 
@@ -1234,7 +1242,7 @@ async function handleTask(argv) {
   ensureClaudeReady(cwd);
 
   const write = Boolean(options.write);
-  const ownerSessionId = options["owner-session-id"] || null;
+  const ownerSessionId = resolveOwnerSessionId(options["owner-session-id"]);
   const explicitJobId = resolveExplicitJobId(options["job-id"], workspaceRoot);
   await withReleasedReservation(workspaceRoot, explicitJobId, async () => {
     const taskMetadata = buildTaskRunMetadata({

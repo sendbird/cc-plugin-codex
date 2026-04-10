@@ -114,6 +114,8 @@ Scope `auto` (the default) inspects `git status` and chooses between working-tre
 
 In foreground, review returns the result directly. In background, the plugin uses a Codex built-in subagent, tracks the review as a job, and nudges you to open the result when it completes.
 
+If the diff is too large to inline safely, the review prompt falls back to concise status/stat context and tells Claude to inspect the diff directly with read-only `git diff` commands instead of failing the run.
+
 ### `$cc:adversarial-review`
 
 Same as `$cc:review`, but steers Claude to challenge the implementation — tradeoffs, alternative approaches, hidden assumptions.
@@ -163,9 +165,11 @@ Background rescue runs through a built-in Codex subagent. When the child finishe
 ```text
 $cc:status                          # list active and recent jobs
 $cc:status task-abc123              # detailed status for one job
-$cc:status --all                    # include older jobs
+$cc:status --all                    # show all tracked jobs in this repository workspace
 $cc:status --wait task-abc123       # block until job completes
 ```
+
+By default, `$cc:status` shows jobs owned by the current Codex session. Use `--all` when you want the wider repository view across older or sibling sessions in the same workspace.
 
 ### `$cc:result`
 
@@ -205,7 +209,7 @@ All review and rescue commands support `--background`. Background jobs are track
 3. **Completion nudges** — when a background built-in flow finishes, the plugin tries to nudge the parent thread with the right `$cc:result <job-id>`. If that nudge cannot surface cleanly, unread-result hooks are the backstop.
    The nudge is intentionally just a pointer. The actual stored result still opens through `$cc:result`.
 4. **Unread-result fallback** — when you submit your next prompt after a finished unread job, Codex can remind you that a result is waiting and point you to `$cc:status` / `$cc:result`.
-5. **Session ownership** — jobs are scoped to the Codex session that created them. Nested sessions do not steal ownership of parent jobs.
+5. **Session ownership** — jobs stay attached to the user-facing parent Codex session even when a built-in rescue/review child does the actual work, so plain `$cc:status` still shows the job you just launched.
 6. **Cleanup on exit** — when your Codex session ends, any still-running detached jobs are terminated via PID identity validation, and stale reserved job markers are cleaned up over time.
 
 **Typical background flow:**
@@ -316,6 +320,18 @@ $cc:status
 $cc:result
 ```
 The built-in notify path is best-effort. The tracked job store and unread hook remain the reliable fallback.
+
+If you think the job may belong to an older session in the same repository, use:
+```text
+$cc:status --all
+```
+
+**Large review diff caused a failure or was omitted**
+That is expected on very large diffs. The plugin now degrades to a compact review context and points Claude toward read-only `git diff` commands instead of trying to inline everything. If you want the full picture, run a narrower review such as:
+```text
+$cc:review --base main
+$cc:review --scope working-tree
+```
 
 **Review gate draining tokens**
 Disable it: `$cc:setup --disable-review-gate`. The gate fires on every Ctrl+C, which adds up.

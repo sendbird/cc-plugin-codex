@@ -77,6 +77,26 @@ describe("runCommand", () => {
     assert.equal(result.status, 0);
     assert.equal(capturedOptions?.shell, false);
   });
+
+  it("passes maxBuffer through to spawnSync", () => {
+    let capturedOptions = null;
+    const result = runCommand("echo", ["hello"], {
+      maxBuffer: 1234,
+      spawnSyncImpl: (_command, _args, options) => {
+        capturedOptions = options;
+        return {
+          status: 0,
+          signal: null,
+          stdout: "hello\n",
+          stderr: "",
+          error: null,
+        };
+      },
+    });
+
+    assert.equal(result.status, 0);
+    assert.equal(capturedOptions?.maxBuffer, 1234);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -124,6 +124,45 @@ describe("buildStatusSnapshot", () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it("status --all bypasses the current-session filter and shows workspace jobs", () => {
+    const repoDir = createTempGitRepo();
+    const scopedIds = ["test-status-all-a", "test-status-all-b"];
+    try {
+      writeJobFile(repoDir, scopedIds[0], {
+        id: scopedIds[0],
+        status: "completed",
+        jobClass: "task",
+        sessionId: "session-a",
+        createdAt: "2026-04-03T10:00:00Z",
+        completedAt: "2026-04-03T10:00:01Z",
+        updatedAt: "2026-04-03T10:00:01Z",
+      });
+      writeJobFile(repoDir, scopedIds[1], {
+        id: scopedIds[1],
+        status: "completed",
+        jobClass: "review",
+        sessionId: "session-b",
+        createdAt: "2026-04-03T11:00:00Z",
+        completedAt: "2026-04-03T11:00:01Z",
+        updatedAt: "2026-04-03T11:00:01Z",
+      });
+
+      setCurrentSession(repoDir, "session-a");
+      const snapshot = buildStatusSnapshot(repoDir, { all: true });
+
+      const ids = [
+        snapshot.latestFinished?.id,
+        ...snapshot.recent.map((job) => job.id),
+        ...snapshot.running.map((job) => job.id),
+      ].filter(Boolean);
+      assert.ok(ids.includes(scopedIds[0]));
+      assert.ok(ids.includes(scopedIds[1]));
+    } finally {
+      clearCurrentSession(repoDir);
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
