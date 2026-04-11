@@ -695,10 +695,14 @@ function startMockProvider({
   taskPrompt,
   userRequest,
   mode = "builtin-default",
+  skillTitle = "Claude Code Rescue",
+  expectedParentNeedles = [],
   taskCommand: taskCommandOverride = null,
   expectedChildNeedles = [],
   expectedFinalOutput = null,
   notificationMessage = null,
+  spawnMessage = null,
+  childPromptChecks = "rescue",
 }) {
   const requests = [];
   const errors = [];
@@ -751,13 +755,19 @@ function startMockProvider({
           phases.push("parent-init");
           const serializedUserRequest = JSON.stringify(userRequest).slice(1, -1);
           assert.ok(
-            bodyText.includes("Claude Code Rescue"),
-            "rescue skill should be injected into the parent turn"
+            bodyText.includes(skillTitle),
+            `${skillTitle} skill should be injected into the parent turn`
           );
           assert.ok(
             bodyText.includes(userRequest) || bodyText.includes(serializedUserRequest),
             "raw user prompt should reach the parent turn"
           );
+          for (const needle of expectedParentNeedles) {
+            assert.ok(
+              bodyText.includes(needle),
+              `parent turn should include ${needle}`
+            );
+          }
           assert.ok(
             getToolNames(body).includes("spawn_agent"),
             "spawn_agent should be available in the parent turn"
@@ -788,6 +798,7 @@ function startMockProvider({
             model: "gpt-5.4-mini",
             reasoning_effort: "medium",
             message:
+              spawnMessage ??
               "You are a transient forwarding worker for Claude Code rescue.\n" +
               "Run exactly one shell command.\n" +
               "Return only that command's stdout text exactly.\n" +
@@ -810,42 +821,44 @@ function startMockProvider({
         } else if (responseIndex === 2) {
           phases.push("child-shell");
           assert.ok(
-            bodyText.includes("Run exactly one shell command") ||
-              bodyText.includes("Run exactly this command and return stdout unchanged"),
-            "spawned child turn should receive the forwarding contract"
-          );
-          assert.ok(
             bodyText.includes(COMPANION_SCRIPT),
             "spawned child turn should receive the companion path"
           );
-          assert.ok(
-            bodyText.includes("transient forwarding worker for Claude Code rescue"),
-            "built-in child should receive the stricter forwarding contract"
-          );
-          assert.ok(
-            bodyText.includes("Return only that command's stdout text exactly"),
-            "built-in child should be told to preserve stdout exactly"
-          );
-          assert.ok(
-            bodyText.includes("Ignore stderr progress chatter such as [cc] lines."),
-            "built-in child should be told to ignore stderr progress chatter"
-          );
-          assert.ok(
-            bodyText.includes("preserve only the final stdout-equivalent result text"),
-            "built-in child should be told to prefer the final stdout-equivalent result over stderr chatter"
-          );
-          assert.ok(
-            bodyText.includes("Do not drop prefixes like completed:"),
-            "built-in child should be told not to strip completed: prefixes"
-          );
-          assert.ok(
-            bodyText.includes("Do not trim, normalize, add punctuation, or add commentary."),
-            "built-in child should be told not to rewrite stdout"
-          );
-          assert.ok(
-            bodyText.includes("Copy the resolved rescue task text byte-for-byte"),
-            "built-in child should be told to preserve the exact task text in the command"
-          );
+          if (childPromptChecks === "rescue") {
+            assert.ok(
+              bodyText.includes("Run exactly one shell command") ||
+                bodyText.includes("Run exactly this command and return stdout unchanged"),
+              "spawned child turn should receive the forwarding contract"
+            );
+            assert.ok(
+              bodyText.includes("transient forwarding worker for Claude Code rescue"),
+              "built-in child should receive the stricter forwarding contract"
+            );
+            assert.ok(
+              bodyText.includes("Return only that command's stdout text exactly"),
+              "built-in child should be told to preserve stdout exactly"
+            );
+            assert.ok(
+              bodyText.includes("Ignore stderr progress chatter such as [cc] lines."),
+              "built-in child should be told to ignore stderr progress chatter"
+            );
+            assert.ok(
+              bodyText.includes("preserve only the final stdout-equivalent result text"),
+              "built-in child should be told to prefer the final stdout-equivalent result over stderr chatter"
+            );
+            assert.ok(
+              bodyText.includes("Do not drop prefixes like completed:"),
+              "built-in child should be told not to strip completed: prefixes"
+            );
+            assert.ok(
+              bodyText.includes("Do not trim, normalize, add punctuation, or add commentary."),
+              "built-in child should be told not to rewrite stdout"
+            );
+            assert.ok(
+              bodyText.includes("Copy the resolved rescue task text byte-for-byte"),
+              "built-in child should be told to preserve the exact task text in the command"
+            );
+          }
           assert.doesNotMatch(
             bodyText,
             /claude-companion\.mjs"\s+task\s+--background|claude-companion\.mjs"\s+task\s+--wait|claude-companion\.mjs\s+task\s+--background|claude-companion\.mjs\s+task\s+--wait/,
@@ -1676,6 +1689,93 @@ describe("Codex direct-skill E2E", () => {
     }
   });
 
+  it("routes $cc:review --background through the built-in path with notification steering", async (t) => {
+    if (!codexAvailable()) {
+      t.skip("codex CLI is not available in this environment");
+      return;
+    }
+
+    const testEnv = createEnvironment();
+    const workspaceDir = path.join(testEnv.rootDir, "review-background-workspace");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    setupGitWorkspace(workspaceDir);
+    fs.writeFileSync(
+      path.join(workspaceDir, "app.js"),
+      "export function value() {\n  return 5;\n}\n",
+      "utf8"
+    );
+
+    const reservedJobId = "review-background-steer-123";
+    const ownerSessionId = "parent-review-session";
+    const userRequest = "$cc:review --background --scope working-tree --model haiku";
+    const notificationMessage =
+      `Background Claude Code review finished. Open it with $cc:result ${reservedJobId}.`;
+    const provider = startMockProvider({
+      taskPrompt: "background review raw output should not surface",
+      userRequest,
+      skillTitle: "Claude Code Review",
+      expectedParentNeedles: [
+        "review-reserve-job --json",
+        "--owner-session-id <parent-session-id>",
+        "allow one extra `send_input` call after a successful shell result",
+        "must target the provided parent thread id",
+        "do not silently drop the completion notification path from the child prompt",
+        "Background Claude Code review finished. Open it with $cc:result <reserved-job-id>.",
+      ],
+      taskCommand:
+        `node ${JSON.stringify(COMPANION_SCRIPT)} review --view-state defer --scope working-tree --model haiku --job-id ${JSON.stringify(reservedJobId)} --owner-session-id ${JSON.stringify(ownerSessionId)}`,
+      expectedChildNeedles: [
+        "--view-state defer",
+        "--job-id",
+        reservedJobId,
+        "--owner-session-id",
+        ownerSessionId,
+        "send_input",
+        notificationMessage,
+      ],
+      notificationMessage,
+      childPromptChecks: "generic",
+      spawnMessage:
+        "You are a pure forwarder for a background Claude Code review job.\n" +
+        "Do not inspect the repo, do not review anything yourself, and do not add commentary.\n" +
+        "Run exactly one shell command and capture only the stdout-equivalent final result text from that command, ignoring stderr progress chatter like [cc] lines.\n" +
+        "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
+        JSON.stringify(notificationMessage) + "\n" +
+        "Use that same sentence as your own final assistant message.\n" +
+        "If the command fails, return only the command stdout if any, otherwise a terse failure note.\n\n" +
+        `node ${JSON.stringify(COMPANION_SCRIPT)} review --view-state defer --scope working-tree --model haiku --job-id ${JSON.stringify(reservedJobId)} --owner-session-id ${JSON.stringify(ownerSessionId)}`,
+    });
+    testEnv.providerPort = await provider.listen();
+    installHooks(testEnv);
+    writeConfigToml(testEnv, testEnv.providerPort);
+
+    try {
+      const execResult = await runCodexExec(
+        testEnv,
+        buildSkillPrompt("cc:review", REVIEW_SKILL_PATH, userRequest),
+        { cwd: workspaceDir }
+      );
+
+      assert.equal(
+        execResult.status,
+        0,
+        [
+          "background review codex exec failed",
+          `stdout:\n${execResult.stdout}`,
+          `stderr:\n${execResult.stderr}`,
+          `provider requests: ${provider.requests.length}`,
+          `provider errors: ${JSON.stringify(provider.errors, null, 2)}`,
+        ].join("\n\n")
+      );
+
+      const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8").trim();
+      assert.equal(finalMessage, notificationMessage);
+    } finally {
+      await provider.close();
+      cleanupEnvironment(testEnv);
+    }
+  });
+
   it("routes $cc:adversarial-review --wait through the companion command with focus text", async (t) => {
     if (!codexAvailable()) {
       t.skip("codex CLI is not available in this environment");
@@ -1725,6 +1825,99 @@ describe("Codex direct-skill E2E", () => {
         claudeInvocations.some((entry) => entry.prompt.includes("focus on race conditions")),
         "adversarial review e2e should preserve the user focus text in the Claude prompt"
       );
+    } finally {
+      await provider.close();
+      cleanupEnvironment(testEnv);
+    }
+  });
+
+  it("routes $cc:adversarial-review --background through the built-in path with notification steering", async (t) => {
+    if (!codexAvailable()) {
+      t.skip("codex CLI is not available in this environment");
+      return;
+    }
+
+    const testEnv = createEnvironment();
+    const workspaceDir = path.join(testEnv.rootDir, "adversarial-background-workspace");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    setupGitWorkspace(workspaceDir);
+    fs.writeFileSync(
+      path.join(workspaceDir, "app.js"),
+      "export function value() {\n  return 6;\n}\n",
+      "utf8"
+    );
+
+    const reservedJobId = "adversarial-background-steer-123";
+    const ownerSessionId = "parent-adversarial-session";
+    const userRequest =
+      "$cc:adversarial-review --background --scope working-tree --model haiku focus on race conditions";
+    const notificationMessage =
+      `Background Claude Code adversarial review finished. Open it with $cc:result ${reservedJobId}.`;
+    const provider = startMockProvider({
+      taskPrompt: "background adversarial review raw output should not surface",
+      userRequest,
+      skillTitle: "Claude Code Adversarial Review",
+      expectedParentNeedles: [
+        "review-reserve-job --json",
+        "--owner-session-id <parent-session-id>",
+        "allow one extra `send_input` call after a successful shell result",
+        "must target the provided parent thread id",
+        "do not silently drop the completion notification path from the child prompt",
+        "Background Claude Code adversarial review finished. Open it with $cc:result <reserved-job-id>.",
+      ],
+      taskCommand:
+        `node ${JSON.stringify(COMPANION_SCRIPT)} adversarial-review --view-state defer --scope working-tree --model haiku --job-id ${JSON.stringify(reservedJobId)} --owner-session-id ${JSON.stringify(ownerSessionId)} focus on race conditions`,
+      expectedChildNeedles: [
+        "--view-state defer",
+        "--job-id",
+        reservedJobId,
+        "--owner-session-id",
+        ownerSessionId,
+        "send_input",
+        notificationMessage,
+        "focus on race conditions",
+      ],
+      notificationMessage,
+      childPromptChecks: "generic",
+      spawnMessage:
+        "You are a pure forwarder for a background Claude Code adversarial review job.\n" +
+        "Do not inspect the repo, do not review anything yourself, and do not add commentary.\n" +
+        "Run exactly one shell command and capture only the stdout-equivalent final result text from that command, ignoring stderr progress chatter like [cc] lines.\n" +
+        "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
+        JSON.stringify(notificationMessage) + "\n" +
+        "Use that same sentence as your own final assistant message.\n" +
+        "If the command fails, return only the command stdout if any, otherwise a terse failure note.\n\n" +
+        `node ${JSON.stringify(COMPANION_SCRIPT)} adversarial-review --view-state defer --scope working-tree --model haiku --job-id ${JSON.stringify(reservedJobId)} --owner-session-id ${JSON.stringify(ownerSessionId)} focus on race conditions`,
+    });
+    testEnv.providerPort = await provider.listen();
+    installHooks(testEnv);
+    writeConfigToml(testEnv, testEnv.providerPort);
+
+    try {
+      const execResult = await runCodexExec(
+        testEnv,
+        buildSkillPrompt(
+          "cc:adversarial-review",
+          ADVERSARIAL_REVIEW_SKILL_PATH,
+          userRequest
+        ),
+        { cwd: workspaceDir }
+      );
+
+      assert.equal(
+        execResult.status,
+        0,
+        [
+          "background adversarial review codex exec failed",
+          `stdout:\n${execResult.stdout}`,
+          `stderr:\n${execResult.stderr}`,
+          `provider requests: ${provider.requests.length}`,
+          `provider errors: ${JSON.stringify(provider.errors, null, 2)}`,
+        ].join("\n\n")
+      );
+
+      const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8").trim();
+      assert.equal(finalMessage, notificationMessage);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);

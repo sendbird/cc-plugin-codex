@@ -877,12 +877,26 @@ describe("claude-companion integration", () => {
 
       const storedJob = readStoredJobById(testEnv, launch.jobId);
       assert.equal(storedJob.sessionId, "parent-session");
+      assert.equal(
+        JSON.parse(
+          fs.readFileSync(path.join(stateDirFor(testEnv), "current-session.json"), "utf8")
+        ).sessionId,
+        "parent-session"
+      );
 
       const statusPayload = runCompanionJson(
         ["status", "--cwd", testEnv.workspaceDir, "--json"],
         { env: testEnv.env }
       );
       assert.equal(statusPayload.latestFinished?.id, launch.jobId);
+
+      const resumeCandidate = runCompanionJson(
+        ["task-resume-candidate", "--cwd", testEnv.workspaceDir, "--json"],
+        { env: testEnv.env }
+      );
+      assert.equal(resumeCandidate.available, true);
+      assert.equal(resumeCandidate.sessionId, "parent-session");
+      assert.equal(resumeCandidate.candidate?.id, launch.jobId);
     } finally {
       cleanupTestEnvironment(testEnv);
     }
@@ -918,6 +932,12 @@ describe("claude-companion integration", () => {
 
       const storedJob = readStoredJobById(testEnv, launch.jobId);
       assert.equal(storedJob.sessionId, "parent-review-session");
+      assert.equal(
+        JSON.parse(
+          fs.readFileSync(path.join(stateDirFor(testEnv), "current-session.json"), "utf8")
+        ).sessionId,
+        "parent-review-session"
+      );
 
       const statusPayload = runCompanionJson(
         ["status", "--cwd", testEnv.workspaceDir, "--json"],

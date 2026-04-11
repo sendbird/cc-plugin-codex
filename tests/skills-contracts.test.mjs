@@ -37,7 +37,11 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(review, /review --view-state defer/i);
   assert.match(review, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
+  assert.match(review, /allow one extra `send_input` call after a successful shell result/i);
+  assert.match(review, /must target the provided parent thread id/i);
+  assert.match(review, /do not silently drop the completion notification path from the child prompt/i);
   assert.match(review, /Background Claude Code review finished\. Open it with \$cc:result <reserved-job-id>\./i);
+  assert.match(review, /that `send_input` message should use one of those exact steering messages/i);
   assert.match(review, /use these steering messages instead of embedding the raw review result in the notification/i);
   assert.match(review, /do not embed the raw Claude result inside the notification message/i);
   assert.match(review, /do not include any other prose in that notification message/i);
@@ -63,7 +67,11 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(adversarial, /adversarial-review --view-state defer/i);
   assert.match(adversarial, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
+  assert.match(adversarial, /allow one extra `send_input` call after a successful shell result/i);
+  assert.match(adversarial, /must target the provided parent thread id/i);
+  assert.match(adversarial, /do not silently drop the completion notification path from the child prompt/i);
   assert.match(adversarial, /Background Claude Code adversarial review finished\. Open it with \$cc:result <reserved-job-id>\./i);
+  assert.match(adversarial, /that `send_input` message should use one of those exact steering messages/i);
   assert.match(adversarial, /use these steering messages instead of embedding the raw review result in the notification/i);
   assert.match(adversarial, /do not embed the raw Claude result inside the notification message/i);
   assert.match(adversarial, /do not include any other prose in that notification message/i);

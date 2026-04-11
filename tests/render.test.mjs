@@ -456,7 +456,8 @@ describe("renderJobStatusReport", () => {
       startedAt: "2026-04-02T19:00:00.000Z",
       completedAt: "2026-04-02T19:01:00.000Z",
       duration: "1m",
-      sessionId: "sess1",
+      sessionId: "owner-sess",
+      threadId: "claude-sess",
       logFile: "/tmp/log.txt",
     };
     const output = renderJobStatusReport(job);
@@ -470,7 +471,9 @@ describe("renderJobStatusReport", () => {
     assert.ok(output.includes("| Duration | 1m |"));
     assert.ok(output.includes("| Log | [log.txt](/tmp/log.txt) |"));
     assert.ok(output.includes("| Result | `$cc:result j1` |"));
-    assert.ok(output.includes("| Resume | `claude --resume sess1` |"));
+    assert.ok(output.includes("| Claude Code session | `claude-sess` |"));
+    assert.ok(output.includes("| Owning Codex session | `owner-sess` |"));
+    assert.ok(output.includes("| Resume | `claude --resume claude-sess` |"));
   });
 
   it("shows cancel action for active jobs", () => {
@@ -495,15 +498,29 @@ describe("renderJobStatusReport", () => {
 
 describe("renderStoredJobResult", () => {
   it("returns rendered content with session info", () => {
-    const job = { id: "j1", sessionId: "sess1" };
+    const job = { id: "j1", sessionId: "owner-sess", threadId: "claude-sess" };
     const stored = {
-      sessionId: "sess1",
-      result: { result: {} },
+      sessionId: "owner-sess",
+      result: { result: {}, sessionId: "claude-sess" },
       rendered: "Review output here.",
     };
     const output = renderStoredJobResult(job, stored);
     assert.ok(output.includes("Review output here."));
-    assert.ok(output.includes("claude --resume sess1"));
+    assert.ok(output.includes("Claude Code session: claude-sess"));
+    assert.ok(output.includes("Owning Codex session: owner-sess"));
+    assert.ok(output.includes("claude --resume claude-sess"));
+  });
+
+  it("does not treat the owning Codex session as a Claude resume target", () => {
+    const job = { id: "j1", sessionId: "owner-sess" };
+    const stored = {
+      sessionId: "owner-sess",
+      rendered: "Review output here.",
+    };
+    const output = renderStoredJobResult(job, stored);
+    assert.ok(output.includes("Owning Codex session: owner-sess"));
+    assert.ok(!output.includes("Claude Code session: owner-sess"));
+    assert.ok(!output.includes("claude --resume owner-sess"));
   });
 
   it("returns rendered content for plain standard reviews", () => {
