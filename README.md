@@ -178,7 +178,11 @@ $cc:result                          # open the latest finished job for this sess
 $cc:result task-abc123              # show finished job output
 ```
 
-The output includes the Claude session ID. To reopen that session directly:
+When a job came from a built-in background child, the output can show both:
+- the **Claude Code session** you can resume with `claude --resume ...`
+- the **Owning Codex session** that owns the tracked job inside Codex
+
+To reopen the Claude Code session directly:
 
 ```bash
 claude --resume <session-id>
@@ -209,7 +213,7 @@ All review and rescue commands support `--background`. Background jobs are track
 3. **Completion nudges** — when a background built-in flow finishes, the plugin tries to nudge the parent thread with the right `$cc:result <job-id>`. If that nudge cannot surface cleanly, unread-result hooks are the backstop.
    The nudge is intentionally just a pointer. The actual stored result still opens through `$cc:result`.
 4. **Unread-result fallback** — when you submit your next prompt after a finished unread job, Codex can remind you that a result is waiting and point you to `$cc:status` / `$cc:result`.
-5. **Session ownership** — jobs stay attached to the user-facing parent Codex session even when a built-in rescue/review child does the actual work, so plain `$cc:status` still shows the job you just launched.
+5. **Session ownership** — jobs stay attached to the user-facing parent Codex session even when a built-in rescue/review child does the actual work, so plain `$cc:status`, `$cc:result`, and resume-candidate detection still follow the parent thread.
 6. **Cleanup on exit** — when your Codex session ends, any still-running detached jobs are terminated via PID identity validation, and stale reserved job markers are cleaned up over time.
 
 **Typical background flow:**
@@ -325,6 +329,8 @@ If you think the job may belong to an older session in the same repository, use:
 ```text
 $cc:status --all
 ```
+
+If a finished result shows both a **Claude Code session** and an **Owning Codex session**, use the Claude Code session for `claude --resume ...`. The owning session is there only to explain which Codex thread owns the tracked job.
 
 **Large review diff caused a failure or was omitted**
 That is expected on very large diffs. The plugin now degrades to a compact review context and points Claude toward read-only `git diff` commands instead of trying to inline everything. If you want the full picture, run a narrower review such as:

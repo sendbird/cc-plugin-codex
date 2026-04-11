@@ -61,6 +61,7 @@ import {
   resolveJobsDir,
   resolveJobLogFile,
   sanitizeId,
+  setCurrentSession,
   setConfig,
   transitionJob,
   writeJobFile,
@@ -180,6 +181,13 @@ function resolveOwnerSessionId(value) {
   const trimmed = value == null ? "" : String(value).trim();
   if (!trimmed) return null;
   return sanitizeId(trimmed, "session ID");
+}
+
+function alignCurrentSessionToOwner(workspaceRoot, ownerSessionId) {
+  if (!ownerSessionId) {
+    return;
+  }
+  setCurrentSession(workspaceRoot, ownerSessionId);
 }
 
 async function withReleasedReservation(workspaceRoot, explicitJobId, fn) {
@@ -1131,6 +1139,7 @@ async function handleReviewCommand(argv, config) {
     // Validate inside the reservation guard so failures do not leak markers.
     config.validateRequest?.(target, focusText);
     const metadata = buildReviewJobMetadata(config.reviewName, target);
+    alignCurrentSessionToOwner(workspaceRoot, ownerSessionId);
 
     const job = createCompanionJob({
       prefix: "review",
@@ -1249,6 +1258,7 @@ async function handleTask(argv) {
       prompt,
       resumeLast
     });
+    alignCurrentSessionToOwner(workspaceRoot, ownerSessionId);
 
     // Resolve resume session inside the reservation guard so failures do not leak markers.
     let resumeSessionId = null;

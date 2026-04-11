@@ -108,9 +108,23 @@ export function escapeMarkdownCell(value) {
   return String(value ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
 
-function formatClaudeResumeCommand(job) {
-  if (!job?.sessionId) return null;
-  return `claude --resume ${job.sessionId}`;
+function resolveClaudeSessionId(job, storedJob = null) {
+  return (
+    storedJob?.result?.sessionId ??
+    storedJob?.threadId ??
+    job?.threadId ??
+    null
+  );
+}
+
+function resolveOwningSessionId(job, storedJob = null) {
+  return storedJob?.sessionId ?? job?.sessionId ?? null;
+}
+
+function formatClaudeResumeCommand(job, storedJob = null) {
+  const sessionId = resolveClaudeSessionId(job, storedJob);
+  if (!sessionId) return null;
+  return `claude --resume ${sessionId}`;
 }
 
 function formatClaudeSkillCommand(skill, jobId = null) {
@@ -306,7 +320,14 @@ export function renderJobStatusReport(job) {
   pushKeyValueTableRow(lines, "Ended", job.completedAt ?? "");
   if (isPendingJob(job)) pushKeyValueTableRow(lines, "Elapsed", job.elapsed ?? "");
   else pushKeyValueTableRow(lines, "Duration", job.duration ?? job.elapsed ?? "");
-  if (job.sessionId) pushKeyValueTableRow(lines, "Claude Code session", `\`${job.sessionId}\``, { raw: true });
+  const ownerSessionId = resolveOwningSessionId(job);
+  const claudeSessionId = resolveClaudeSessionId(job);
+  if (claudeSessionId) {
+    pushKeyValueTableRow(lines, "Claude Code session", `\`${claudeSessionId}\``, { raw: true });
+  }
+  if (ownerSessionId && ownerSessionId !== claudeSessionId) {
+    pushKeyValueTableRow(lines, "Owning Codex session", `\`${ownerSessionId}\``, { raw: true });
+  }
   const resumeCmd = formatClaudeResumeCommand(job);
   if (resumeCmd) pushKeyValueTableRow(lines, "Resume", `\`${resumeCmd}\``, { raw: true });
   const logLink = formatLogFileLink(job.logFile);
@@ -328,23 +349,34 @@ export function renderJobStatusReport(job) {
 }
 
 export function renderStoredJobResult(job, storedJob) {
-  const sessionId = storedJob?.sessionId ?? job.sessionId ?? null;
-  const resumeCmd = sessionId ? `claude --resume ${sessionId}` : null;
+  const ownerSessionId = resolveOwningSessionId(job, storedJob);
+  const claudeSessionId = resolveClaudeSessionId(job, storedJob);
+  const resumeCmd = formatClaudeResumeCommand(job, storedJob);
   const recoveredStructuredOutput = normalizeStoredOutput(
     recoverStructuredStoredReviewOutput(job, storedJob)
   );
   if (recoveredStructuredOutput) {
-    if (!sessionId) return recoveredStructuredOutput;
-    return `${recoveredStructuredOutput}\nClaude Code session: ${sessionId}\nResume: ${resumeCmd}\n`;
+    if (!claudeSessionId && !ownerSessionId) return recoveredStructuredOutput;
+    let suffix = "";
+    if (claudeSessionId) suffix += `\nClaude Code session: ${claudeSessionId}\n`;
+    if (ownerSessionId && ownerSessionId !== claudeSessionId) suffix += `Owning Codex session: ${ownerSessionId}\n`;
+    if (resumeCmd) suffix += `Resume: ${resumeCmd}\n`;
+    return `${recoveredStructuredOutput}${suffix}`;
   }
   const storedOutput = normalizeStoredOutput(getStoredJobOutput(storedJob));
   if (storedOutput) {
     const output = storedOutput;
-    if (!sessionId) return output;
-    return `${output}\nClaude Code session: ${sessionId}\nResume: ${resumeCmd}\n`;
+    if (!claudeSessionId && !ownerSessionId) return output;
+    let suffix = "\n";
+    if (claudeSessionId) suffix += `Claude Code session: ${claudeSessionId}\n`;
+    if (ownerSessionId && ownerSessionId !== claudeSessionId) suffix += `Owning Codex session: ${ownerSessionId}\n`;
+    if (resumeCmd) suffix += `Resume: ${resumeCmd}\n`;
+    return `${output}${suffix}`;
   }
   const lines = [`# ${job.title ?? "Claude Code Result"}`, "", `Job: ${job.id}`, `Status: ${job.status}`];
-  if (sessionId) { lines.push(`Claude Code session: ${sessionId}`); lines.push(`Resume: ${resumeCmd}`); }
+  if (claudeSessionId) lines.push(`Claude Code session: ${claudeSessionId}`);
+  if (ownerSessionId && ownerSessionId !== claudeSessionId) lines.push(`Owning Codex session: ${ownerSessionId}`);
+  if (resumeCmd) lines.push(`Resume: ${resumeCmd}`);
   if (job.summary) lines.push(`Summary: ${job.summary}`);
   if (job.errorMessage) lines.push("", job.errorMessage);
   else if (storedJob?.errorMessage) lines.push("", storedJob.errorMessage);

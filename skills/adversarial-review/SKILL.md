@@ -82,11 +82,14 @@ Background flow:
   - return only that command's stdout exactly, with no added commentary
   - ignore stderr progress chatter such as `[cc] ...` lines and preserve only the final stdout-equivalent result text
   - not inspect the repo or perform the review itself
-  - if a parent thread id is available, allow one extra `send_input` after success and before finishing
+  - if a parent thread id is available, allow one extra `send_input` call after a successful shell result and before finishing
+  - that `send_input` call must target the provided parent thread id, must happen at most once, and must not run on failure paths
+  - if the parent provided a non-empty parent thread id, do not silently drop the completion notification path from the child prompt
   - if a reserved review job id is available, use this exact notification message:
     `Background Claude Code adversarial review finished. Open it with $cc:result <reserved-job-id>.`
   - otherwise fall back to:
     `Background Claude Code adversarial review finished. Inspect it with $cc:status first, then use $cc:result for the finished job you want to open.`
+  - that `send_input` message should use one of those exact steering messages instead of inlining the raw review result
   - use these steering messages instead of embedding the raw review result in the notification
   - do not embed the raw Claude result inside the notification message
   - do not include any other prose in that notification message
