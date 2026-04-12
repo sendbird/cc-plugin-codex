@@ -15,7 +15,6 @@ jobs:
       matrix:
         os:
           - windows-latest
-          - ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
@@ -32,6 +31,26 @@ jobs:
   macos-full:
     name: Full CI (macos-latest)
     runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install -g @openai/codex
+      - run: codex --version
+      - run: npm ci
+      - run: npm run check:version-sync
+      - run: npm run check:changelog
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run test:integration
+      - run: npm run test:e2e
+
+  linux-full:
+    name: Full CI (ubuntu-latest)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
