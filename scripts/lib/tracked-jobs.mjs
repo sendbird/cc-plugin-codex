@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import process from "node:process";
 
+import { terminateProcessTree } from "./process.mjs";
 import { nowIso, ensureStateDir, getCurrentSession, patchJob, resolveJobLogFile, writeJobFile, cleanupOldJobs, transitionJob } from "./state.mjs";
 
 export { nowIso };
@@ -235,7 +236,7 @@ export async function runTrackedJob(job, runner, options = {}) {
     );
     if (!transition.transitioned) {
       // Job already left running state (cancel won the race) — kill the child immediately
-      try { process.kill(-pid, "SIGTERM"); } catch {}
+      try { terminateProcessTree(pid); } catch {}
       return;
     }
   };

@@ -7,8 +7,8 @@ description: 'Run a design-challenging Claude Code review of local git changes i
 
 Use this skill when the user wants Claude Code to challenge the implementation approach, design choices, assumptions, or tradeoffs in this repository.
 
-Resolve `<plugin-root>` as two directories above this skill file. The companion entrypoint is:
-`node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
+Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
+`node "<installed-plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
 
 Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, plus optional focus text after the flags
 
@@ -49,19 +49,21 @@ Argument handling:
 
 Foreground flow:
 - Run:
-  `node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review --view-state on-success <arguments with --wait/--background removed>`
+  `node "<installed-plugin-root>/scripts/claude-companion.mjs" adversarial-review --view-state on-success <arguments with --wait/--background removed>`
 - Present the companion stdout faithfully.
 - Do not fix anything mentioned in the review output.
 
 Background flow:
 - For background adversarial review, use Codex's built-in `default` subagent instead of a detached background shell command.
-- Before spawning the built-in child, reserve a review job id by running:
-  `node "<plugin-root>/scripts/claude-companion.mjs" review-reserve-job --json`
+- Never satisfy background adversarial review by running the companion command itself with shell backgrounding such as `&`, `nohup`, detached `spawn`, or any equivalent direct background process launch.
+- Background here means "spawn the forwarding child via `spawn_agent` and do not wait in the parent turn." The companion adversarial-review command inside that child still runs once, in the foreground, inside the child thread.
+- Before spawning the built-in child, capture the review job id plus routing context in one call:
+  `node "<installed-plugin-root>/scripts/claude-companion.mjs" background-routing-context --kind review --json`
 - If that helper returns a non-empty `jobId`, pass it into the companion command as an internal `--job-id <reserved-job-id>` routing flag.
-- Add an internal `--owner-session-id <parent-session-id>` routing flag when spawning the built-in child so the tracked review job stays visible in the parent Codex session's plain `$cc:status`.
-- If the built-in review is running in background, the parent should first capture its own thread id by running:
-  `node -e "process.stdout.write(process.env.CODEX_THREAD_ID || '')"`
-- If that command returns a non-empty thread id, pass it into the child prompt as the parent thread id for one-shot completion notification.
+- If that helper returns a non-empty `ownerSessionId`, include `--owner-session-id <owner-session-id>` in the companion command.
+- If it returns an empty `ownerSessionId`, omit `--owner-session-id` entirely. Never leave an empty placeholder such as `--owner-session-id  --job-id`.
+- If that helper returns a non-empty `parentThreadId`, pass it into the child prompt as the parent thread id for one-shot completion notification.
+- If it returns an empty `parentThreadId`, omit the notification path instead of emitting a blank thread-id placeholder.
 - Spawn exactly one transient forwarding child through `spawn_agent` with:
   - `agent_type: "default"`
   - `fork_context: false`
@@ -76,14 +78,17 @@ Background flow:
 - The built-in child must be a pure forwarder. It should:
   - run exactly one shell command
   - execute:
-    `node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review --view-state defer <arguments with --wait/--background removed>`
-  - include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session
+    `node "<installed-plugin-root>/scripts/claude-companion.mjs" adversarial-review --view-state defer <arguments with --wait/--background removed>`
+  - include `--owner-session-id <owner-session-id>` only when the parent resolved a non-empty owner session id
   - include `--job-id <reserved-job-id>` when the parent reserved one
+  - never leave an empty routing placeholder such as `--owner-session-id  --job-id`
   - return only that command's stdout exactly, with no added commentary
   - ignore stderr progress chatter such as `[cc] ...` lines and preserve only the final stdout-equivalent result text
   - not inspect the repo or perform the review itself
   - if a parent thread id is available, allow one extra `send_input` call after a successful shell result and before finishing
+  - the child prompt must mention the tool name `send_input` literally; do not replace it with a vague instruction like "send a message to the parent"
   - that `send_input` call must target the provided parent thread id, must happen at most once, and must not run on failure paths
+  - that `send_input` call should use the exact tool shape `send_input({ target: <parent-thread-id>, message: <steering-message> })` with no extra prose payload
   - if the parent provided a non-empty parent thread id, do not silently drop the completion notification path from the child prompt
   - if a reserved review job id is available, use this exact notification message:
     `Background Claude Code adversarial review finished. Open it with $cc:result <reserved-job-id>.`

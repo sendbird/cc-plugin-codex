@@ -135,11 +135,6 @@ function formatMarkdownLink(label, target) {
   return `[${label}](${target})`;
 }
 
-function formatLogFileLink(logFile) {
-  if (!logFile) return null;
-  return formatMarkdownLink(path.basename(logFile), logFile);
-}
-
 function formatJobTimestamp(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
@@ -330,8 +325,6 @@ export function renderJobStatusReport(job) {
   }
   const resumeCmd = formatClaudeResumeCommand(job);
   if (resumeCmd) pushKeyValueTableRow(lines, "Resume", `\`${resumeCmd}\``, { raw: true });
-  const logLink = formatLogFileLink(job.logFile);
-  if (logLink) pushKeyValueTableRow(lines, "Log", logLink, { raw: true });
   if (job.status === "queued" || job.status === "running") {
     pushKeyValueTableRow(lines, "Cancel", `\`${formatClaudeSkillCommand("cancel", job.id)}\``, { raw: true });
   } else {

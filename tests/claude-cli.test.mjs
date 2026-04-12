@@ -16,6 +16,7 @@ import {
   VALID_EFFORTS,
   SANDBOX_READ_ONLY_BASH_TOOLS,
   SANDBOX_READ_ONLY_TOOLS,
+  SANDBOX_TEMP_DIR,
   SANDBOX_SETTINGS,
   MAX_STREAM_PARSER_UNKNOWN_EVENTS,
   MAX_STREAM_PARSER_PARSE_ERRORS,
@@ -668,17 +669,17 @@ describe("SANDBOX_SETTINGS", () => {
     assert.ok("workspace-write" in SANDBOX_SETTINGS);
   });
 
-  it("read-only enables sandbox with allowWrite ['/tmp']", () => {
+  it("read-only enables sandbox with allowWrite [SANDBOX_TEMP_DIR]", () => {
     const s = SANDBOX_SETTINGS["read-only"].sandbox;
     assert.equal(s.enabled, true);
-    assert.deepEqual(s.filesystem.allowWrite, ["/tmp"]);
+    assert.deepEqual(s.filesystem.allowWrite, [SANDBOX_TEMP_DIR]);
     assert.deepEqual(s.network.allowedDomains, []);
   });
 
-  it("workspace-write enables sandbox with allowWrite ['.', '/tmp']", () => {
+  it("workspace-write enables sandbox with allowWrite ['.', SANDBOX_TEMP_DIR]", () => {
     const s = SANDBOX_SETTINGS["workspace-write"].sandbox;
     assert.equal(s.enabled, true);
-    assert.deepEqual(s.filesystem.allowWrite, [".", "/tmp"]);
+    assert.deepEqual(s.filesystem.allowWrite, [".", SANDBOX_TEMP_DIR]);
     assert.deepEqual(s.network.allowedDomains, []);
   });
 });

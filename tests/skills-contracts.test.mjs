@@ -19,15 +19,21 @@ function read(relativePath) {
 test("review skills keep background execution outside the companion command", () => {
   const review = read("skills/review/SKILL.md");
   const adversarial = read("skills/adversarial-review/SKILL.md");
+  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
 
+  assert.match(review, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(review, installedRootPattern);
   assert.match(review, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(review, /Strip them before calling the companion command/i);
   assert.match(review, /The companion review process itself always runs in the foreground/i);
   assert.match(review, /review --view-state on-success/i);
   assert.match(review, /For background review, use Codex's built-in `default` subagent/i);
-  assert.match(review, /review-reserve-job --json/i);
+  assert.match(review, /Never satisfy background review by running the companion command itself with shell backgrounding/i);
+  assert.match(review, /Background here means "spawn the forwarding child via `spawn_agent` and do not wait in the parent turn\."/i);
+  assert.match(review, /background-routing-context --kind review --json/i);
   assert.match(review, /internal `--job-id <reserved-job-id>` routing flag/i);
-  assert.match(review, /internal `--owner-session-id <parent-session-id>` routing flag/i);
+  assert.match(review, /non-empty `ownerSessionId`/i);
+  assert.match(review, /omit `--owner-session-id` entirely/i);
   assert.match(review, /spawn_agent/i);
   assert.match(review, /`fork_context: false`/i);
   assert.match(review, /`model: "gpt-5\.4-mini"`/i);
@@ -36,9 +42,12 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /Only consider `fork_context: true` as a last resort/i);
   assert.match(review, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(review, /review --view-state defer/i);
-  assert.match(review, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
+  assert.match(review, /include `--owner-session-id <owner-session-id>` only when the parent resolved a non-empty owner session id/i);
+  assert.match(review, /never leave an empty routing placeholder such as `--owner-session-id {2}--job-id`/i);
   assert.match(review, /allow one extra `send_input` call after a successful shell result/i);
+  assert.match(review, /must mention the tool name `send_input` literally/i);
   assert.match(review, /must target the provided parent thread id/i);
+  assert.match(review, /exact tool shape `send_input\(\{ target: <parent-thread-id>, message: <steering-message> \}\)`/i);
   assert.match(review, /do not silently drop the completion notification path from the child prompt/i);
   assert.match(review, /Background Claude Code review finished\. Open it with \$cc:result <reserved-job-id>\./i);
   assert.match(review, /that `send_input` message should use one of those exact steering messages/i);
@@ -50,14 +59,19 @@ test("review skills keep background execution outside the companion command", ()
   assert.doesNotMatch(review, /claude-companion\.mjs" review --background/i);
   assert.doesNotMatch(review, /claude-companion\.mjs" review \$ARGUMENTS/i);
 
+  assert.match(adversarial, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(adversarial, installedRootPattern);
   assert.match(adversarial, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(adversarial, /Strip them before calling the companion command/i);
   assert.match(adversarial, /The companion review process itself always runs in the foreground/i);
   assert.match(adversarial, /adversarial-review --view-state on-success/i);
   assert.match(adversarial, /For background adversarial review, use Codex's built-in `default` subagent/i);
-  assert.match(adversarial, /review-reserve-job --json/i);
+  assert.match(adversarial, /Never satisfy background adversarial review by running the companion command itself with shell backgrounding/i);
+  assert.match(adversarial, /Background here means "spawn the forwarding child via `spawn_agent` and do not wait in the parent turn\."/i);
+  assert.match(adversarial, /background-routing-context --kind review --json/i);
   assert.match(adversarial, /internal `--job-id <reserved-job-id>` routing flag/i);
-  assert.match(adversarial, /internal `--owner-session-id <parent-session-id>` routing flag/i);
+  assert.match(adversarial, /non-empty `ownerSessionId`/i);
+  assert.match(adversarial, /omit `--owner-session-id` entirely/i);
   assert.match(adversarial, /spawn_agent/i);
   assert.match(adversarial, /`fork_context: false`/i);
   assert.match(adversarial, /`model: "gpt-5\.4-mini"`/i);
@@ -66,9 +80,12 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /Only consider `fork_context: true` as a last resort/i);
   assert.match(adversarial, /retry once with `model: "gpt-5\.4"`/i);
   assert.match(adversarial, /adversarial-review --view-state defer/i);
-  assert.match(adversarial, /include `--owner-session-id <parent-session-id>` so background review jobs stay attached to the parent session/i);
+  assert.match(adversarial, /include `--owner-session-id <owner-session-id>` only when the parent resolved a non-empty owner session id/i);
+  assert.match(adversarial, /never leave an empty routing placeholder such as `--owner-session-id {2}--job-id`/i);
   assert.match(adversarial, /allow one extra `send_input` call after a successful shell result/i);
+  assert.match(adversarial, /must mention the tool name `send_input` literally/i);
   assert.match(adversarial, /must target the provided parent thread id/i);
+  assert.match(adversarial, /exact tool shape `send_input\(\{ target: <parent-thread-id>, message: <steering-message> \}\)`/i);
   assert.match(adversarial, /do not silently drop the completion notification path from the child prompt/i);
   assert.match(adversarial, /Background Claude Code adversarial review finished\. Open it with \$cc:result <reserved-job-id>\./i);
   assert.match(adversarial, /that `send_input` message should use one of those exact steering messages/i);
@@ -83,8 +100,12 @@ test("review skills keep background execution outside the companion command", ()
 
 test("rescue skill keeps --background and --wait as host-side controls only", () => {
   const rescue = read("skills/rescue/SKILL.md");
+  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
 
+  assert.match(rescue, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(rescue, installedRootPattern);
   assert.match(rescue, /`--background` and `--wait` are Codex-side execution controls only/i);
+  assert.match(rescue, /Never satisfy background rescue by launching `claude-companion\.mjs task` itself as a detached shell process/i);
   assert.match(rescue, /Never forward either flag to `claude-companion\.mjs task`/i);
   assert.match(rescue, /The main Codex thread owns that execution-mode choice/i);
   assert.match(rescue, /If the user explicitly passed `--background`, run the rescue subagent in the background/i);
@@ -94,8 +115,9 @@ test("rescue skill keeps --background and --wait as host-side controls only", ()
   assert.match(rescue, /If the user task text itself begins with a slash command such as `\/simplify`/i);
   assert.match(rescue, /Remove `--background` and `--wait` before spawning the subagent/i);
   assert.match(rescue, /If the free-text task begins with `\/`, preserve it verbatim/i);
-  assert.match(rescue, /--owner-session-id <parent-session-id>/i);
-  assert.match(rescue, /task-reserve-job --json/i);
+  assert.match(rescue, /background-routing-context --kind task --json/i);
+  assert.match(rescue, /non-empty `ownerSessionId`/i);
+  assert.match(rescue, /omit `--owner-session-id` entirely/i);
   assert.match(rescue, /internal `--job-id <reserved-job-id>` routing flag/i);
   assert.match(rescue, /Foreground rescue must add `--view-state on-success`/i);
   assert.match(rescue, /Background rescue must add `--view-state defer`/i);
@@ -131,11 +153,12 @@ test("rescue skill documents the experimental built-in-agent forwarding path", (
   assert.match(rescue, /retry once with `model: "gpt-5\.4"` and the same `reasoning_effort: "medium"`/i);
   assert.match(rescue, /clearly says `gpt-5\.4-mini` was unavailable and the parent is retrying with `gpt-5\.4`/i);
   assert.match(rescue, /Do not use that fallback for arbitrary failures/i);
-  assert.match(rescue, /capture its own thread id by running:/i);
-  assert.match(rescue, /process\.env\.CODEX_THREAD_ID/i);
+  assert.match(rescue, /non-empty `parentThreadId`/i);
   assert.match(rescue, /pass it into the child prompt as the parent thread id/i);
   assert.match(rescue, /allow one extra `send_input` call after a successful shell result/i);
+  assert.match(rescue, /must mention the tool name `send_input` literally/i);
   assert.match(rescue, /must target the provided parent thread id/i);
+  assert.match(rescue, /exact tool shape `send_input\(\{ target: <parent-thread-id>, message: <steering-message> \}\)`/i);
   assert.match(rescue, /do not silently drop the completion notification path from the child prompt/i);
   assert.match(rescue, /short user-facing template that steers the parent toward explicit result retrieval instead of inlining the raw result/i);
   assert.match(rescue, /Background Claude Code rescue finished\. Open it with \$cc:result <reserved-job-id>\./i);
@@ -224,8 +247,23 @@ test("rescue parent skill owns resume-candidate exploration", () => {
 test("setup skill auto-installs missing hooks before the final setup report", () => {
   const setup = read("skills/setup/SKILL.md");
 
+  assert.match(setup, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(setup, /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i);
   assert.match(setup, /setup --json/i);
   assert.match(setup, /If setup reports missing hooks, run:/i);
-  assert.match(setup, /node "<plugin-root>\/scripts\/install-hooks\.mjs"/i);
+  assert.match(setup, /node "<installed-plugin-root>\/scripts\/install-hooks\.mjs"/i);
   assert.match(setup, /rerun the final setup command so the user sees the repaired state immediately/i);
+});
+
+test("simple runtime skills use the installed plugin path instead of cache-relative placeholders", () => {
+  const status = read("skills/status/SKILL.md");
+  const result = read("skills/result/SKILL.md");
+  const cancel = read("skills/cancel/SKILL.md");
+  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
+
+  for (const skillText of [status, result, cancel]) {
+    assert.match(skillText, /Do not derive the companion path from this skill file or any cache directory/i);
+    assert.match(skillText, installedRootPattern);
+    assert.doesNotMatch(skillText, /<plugin-root>/i);
+  }
 });

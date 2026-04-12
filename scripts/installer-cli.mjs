@@ -11,7 +11,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { resolveCodexHome } from "./lib/codex-paths.mjs";
+import { samePath, resolveCodexHome } from "./lib/codex-paths.mjs";
+import { materializeInstalledSkillPaths } from "./lib/installed-skill-paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -55,10 +56,6 @@ function parseArgs(argv) {
   return { command };
 }
 
-function samePath(a, b) {
-  return path.resolve(a) === path.resolve(b);
-}
-
 function ensureEmptyDir(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
   fs.mkdirSync(dirPath, { recursive: true });
@@ -97,6 +94,7 @@ function stageInstall(sourceRoot, installDir) {
 
   try {
     copyDistribution(sourceRoot, stagingDir);
+    materializeInstalledSkillPaths(stagingDir, installDir);
     fs.rmSync(installDir, { recursive: true, force: true });
     fs.renameSync(stagingDir, installDir);
   } catch (error) {
@@ -113,6 +111,7 @@ function runLocalInstaller(installDir, command) {
       ...process.env,
       HOME: process.env.HOME || os.homedir(),
       USERPROFILE: process.env.USERPROFILE || process.env.HOME || os.homedir(),
+      CC_PLUGIN_CODEX_SKILLS_MATERIALIZED: "1",
     },
   });
 

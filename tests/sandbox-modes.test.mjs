@@ -12,6 +12,7 @@ import {
   buildArgs,
   SANDBOX_READ_ONLY_BASH_TOOLS,
   SANDBOX_READ_ONLY_TOOLS,
+  SANDBOX_TEMP_DIR,
   SANDBOX_SETTINGS,
   createSandboxSettings,
   cleanupSandboxSettings,
@@ -201,19 +202,19 @@ describe("sandbox settings lifecycle", () => {
 // ---------------------------------------------------------------------------
 
 describe("sandbox settings content", () => {
-  it("read-only: sandbox enabled, allowWrite tmp only, no network", () => {
+  it("read-only: sandbox enabled, allowWrite temp dir only, no network", () => {
     const s = SANDBOX_SETTINGS["read-only"];
     assert.equal(s.sandbox.enabled, true);
     assert.equal(s.sandbox.autoAllowBashIfSandboxed, true);
-    assert.deepEqual(s.sandbox.filesystem.allowWrite, ["/tmp"]);
+    assert.deepEqual(s.sandbox.filesystem.allowWrite, [SANDBOX_TEMP_DIR]);
     assert.deepEqual(s.sandbox.network.allowedDomains, []);
   });
 
-  it("workspace-write: sandbox enabled, allowWrite cwd+tmp, no network", () => {
+  it("workspace-write: sandbox enabled, allowWrite cwd+temp dir, no network", () => {
     const s = SANDBOX_SETTINGS["workspace-write"];
     assert.equal(s.sandbox.enabled, true);
     assert.equal(s.sandbox.autoAllowBashIfSandboxed, true);
-    assert.deepEqual(s.sandbox.filesystem.allowWrite, [".", "/tmp"]);
+    assert.deepEqual(s.sandbox.filesystem.allowWrite, [".", SANDBOX_TEMP_DIR]);
     assert.deepEqual(s.sandbox.network.allowedDomains, []);
   });
 

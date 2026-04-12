@@ -977,6 +977,105 @@ describe("claude-companion integration", () => {
     }
   });
 
+  it("rejects a missing owner session id before the next routing flag is consumed", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+
+      const result = runCompanionExpectFailure(
+        [
+          "review",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--background",
+          "--json",
+          "--scope",
+          "working-tree",
+          "--owner-session-id",
+          "--job-id",
+          "review-bad-owner-session",
+        ],
+        { env: testEnv.env }
+      );
+
+      assert.match(result.stderr, /Missing value for --owner-session-id/);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("reports session routing context from env and current-session marker", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      writeCurrentSessionMarker(testEnv, "marker-session");
+      const payload = runCompanionJson(
+        ["session-routing-context", "--cwd", testEnv.workspaceDir, "--json"],
+        {
+          env: {
+            ...testEnv.env,
+            [SESSION_ID_ENV]: "env-session",
+            CODEX_THREAD_ID: "thread-123",
+          },
+        }
+      );
+
+      assert.equal(payload.ownerSessionId, "env-session");
+      assert.equal(payload.parentThreadId, "thread-123");
+      assert.equal(payload.workspaceRoot, testEnv.workspaceDir);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("drops invalid parent thread ids from session routing context", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      const payload = runCompanionJson(
+        ["session-routing-context", "--cwd", testEnv.workspaceDir, "--json"],
+        {
+          env: {
+            ...testEnv.env,
+            [SESSION_ID_ENV]: "env-session",
+            CODEX_THREAD_ID: "--bad-thread-id",
+          },
+        }
+      );
+
+      assert.equal(payload.ownerSessionId, "env-session");
+      assert.equal(payload.parentThreadId, null);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("reports background routing context with a reserved review job id", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      writeCurrentSessionMarker(testEnv, "marker-session");
+      const payload = runCompanionJson(
+        ["background-routing-context", "--kind", "review", "--cwd", testEnv.workspaceDir, "--json"],
+        {
+          env: {
+            ...testEnv.env,
+            [SESSION_ID_ENV]: "env-session",
+            CODEX_THREAD_ID: "thread-123",
+          },
+        }
+      );
+
+      assert.equal(payload.ownerSessionId, "env-session");
+      assert.equal(payload.parentThreadId, "thread-123");
+      assert.match(payload.jobId, /^review-/);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
   it("keeps completed resume candidates session-scoped and ignores active tasks", async () => {
     const testEnv = createTestEnvironment();
     const sessionAEnv = {
@@ -1141,6 +1240,47 @@ describe("claude-companion integration", () => {
         /\d{4}-\d{2}-\d{2}T/,
         "fetching result should mark the job as viewed"
       );
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("does not expose managed log paths in JSON-facing commands", async () => {
+    const testEnv = createTestEnvironment();
+    const sessionEnv = {
+      ...testEnv.env,
+      [SESSION_ID_ENV]: "session-redacted-log",
+    };
+
+    try {
+      const launch = await runCompanionAsyncJson(
+        [
+          "task",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--background",
+          "--json",
+          "redacted-log delay=40",
+        ],
+        { env: sessionEnv }
+      );
+
+      assert.equal("logFile" in launch, false, "background launch payload should not expose logFile");
+
+      await waitForTerminalStatus(testEnv, launch.jobId, sessionEnv);
+
+      const statusPayload = runCompanionJson(
+        ["status", "--cwd", testEnv.workspaceDir, launch.jobId, "--json"],
+        { env: sessionEnv }
+      );
+      assert.equal("logFile" in statusPayload.job, false, "status --json should not expose logFile");
+
+      const resultPayload = runCompanionJson(
+        ["result", "--cwd", testEnv.workspaceDir, launch.jobId, "--json"],
+        { env: sessionEnv }
+      );
+      assert.equal("logFile" in resultPayload.job, false, "result --json should not expose logFile on job");
+      assert.equal("logFile" in (resultPayload.storedJob ?? {}), false, "result --json should not expose logFile on stored job");
     } finally {
       cleanupTestEnvironment(testEnv);
     }

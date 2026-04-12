@@ -8,6 +8,18 @@ import path from "node:path";
 export const PLUGIN_DATA_NAMESPACE = "cc";
 export const LEGACY_PLUGIN_DATA_NAMESPACES = ["claude-code"];
 
+export function normalizePathSlashes(value) {
+  return value.replace(/\\/g, "/");
+}
+
+export function samePath(a, b, platform = process.platform) {
+  const left = path.resolve(a);
+  const right = path.resolve(b);
+  return platform === "win32"
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
 export function resolveCodexHome() {
   return process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 }

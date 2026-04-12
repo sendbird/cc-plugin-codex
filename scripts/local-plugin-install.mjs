@@ -12,7 +12,8 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { callCodexAppServer } from "./lib/codex-app-server.mjs";
-import { resolveCodexHome } from "./lib/codex-paths.mjs";
+import { normalizePathSlashes, resolveCodexHome, samePath } from "./lib/codex-paths.mjs";
+import { materializeInstalledSkillPaths } from "./lib/installed-skill-paths.mjs";
 import {
   cleanupManagedGlobalIntegrations,
   resolveManagedMarketplacePluginPath,
@@ -30,6 +31,7 @@ const MARKETPLACE_FILE = path.join(HOME_DIR, ".agents", "plugins", "marketplace.
 const CODEX_CONFIG_FILE = path.join(CODEX_HOME, "config.toml");
 const CODEX_SKILLS_DIR = path.join(CODEX_HOME, "skills");
 const CODEX_PROMPTS_DIR = path.join(CODEX_HOME, "prompts");
+const INSTALLED_PLUGIN_ROOT = path.join(CODEX_HOME, "plugins", PLUGIN_NAME);
 const PLUGIN_CONFIG_HEADER = `[plugins."${PLUGIN_NAME}@${MARKETPLACE_NAME}"]`;
 const EXPORTED_SKILLS = [
   "review",
@@ -97,10 +99,6 @@ function normalizeTrailingNewline(text) {
   return `${text.replace(/\s*$/, "")}\n`;
 }
 
-function normalizePathSlashes(value) {
-  return value.replace(/\\/g, "/");
-}
-
 function formatWrapperName(skillName) {
   return `${PLUGIN_NAME}-${skillName}`;
 }
@@ -142,6 +140,7 @@ function rewriteSkillFrontmatter(markdown, skillName) {
 function rewriteSkillBody(markdown, pluginRoot) {
   const normalizedPluginRoot = normalizePathSlashes(pluginRoot);
   return markdown
+    .replaceAll("<installed-plugin-root>", normalizedPluginRoot)
     .replace(
       "Resolve `<plugin-root>` as two directories above this skill file. The companion entrypoint is:",
       "Use the companion entrypoint at:"
@@ -497,6 +496,12 @@ async function uninstallPluginThroughCodex() {
 }
 
 export async function install(pluginRoot, skipHookInstall) {
+  if (
+    samePath(pluginRoot, INSTALLED_PLUGIN_ROOT) &&
+    process.env.CC_PLUGIN_CODEX_SKILLS_MATERIALIZED !== "1"
+  ) {
+    materializeInstalledSkillPaths(pluginRoot);
+  }
   upsertMarketplaceEntry(pluginRoot);
   configureCodexHooks();
   let usedFallback = false;

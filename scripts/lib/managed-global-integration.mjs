@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveCodexHome } from "./codex-paths.mjs";
+import { normalizePathSlashes, resolveCodexHome } from "./codex-paths.mjs";
 
 const MARKETPLACE_NAME = "local-plugins";
 const PLUGIN_NAME = "cc";
@@ -49,10 +49,6 @@ function readText(filePath) {
 function writeText(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, "utf8");
-}
-
-function normalizePathSlashes(value) {
-  return value.replace(/\\/g, "/");
 }
 
 function removeIfEmpty(dirPath) {

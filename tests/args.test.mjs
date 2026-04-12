@@ -68,6 +68,18 @@ describe("parseArgs", () => {
         /Missing value for --output/
       );
     });
+
+    it("throws when the next token is another recognized option", () => {
+      assert.throws(
+        () => parseArgs(["--output", "--model", "sonnet"], config),
+        /Missing value for --output/
+      );
+    });
+
+    it("accepts an unknown --token as a literal value", () => {
+      const result = parseArgs(["--output", "--unknown-flag"], config);
+      assert.equal(result.options.output, "--unknown-flag");
+    });
   });
 
   describe("short options", () => {
@@ -90,6 +102,13 @@ describe("parseArgs", () => {
     it("throws on missing value for short option", () => {
       assert.throws(
         () => parseArgs(["-o"], config),
+        /Missing value for -o/
+      );
+    });
+
+    it("throws when the next short token is another recognized option", () => {
+      assert.throws(
+        () => parseArgs(["-o", "-v"], config),
         /Missing value for -o/
       );
     });

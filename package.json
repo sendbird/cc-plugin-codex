@@ -1,6 +1,6 @@
 {
   "name": "cc-plugin-codex",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Claude Code Plugin for Codex by Sendbird",
   "type": "module",
   "author": {
@@ -51,6 +51,7 @@
     "prepack": "npm run check:version-sync && npm run check:changelog",
     "setup:git-hooks": "node scripts/setup-git-hooks.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:cross-platform": "node --test tests/args.test.mjs tests/changelog.test.mjs tests/claude-cli.test.mjs tests/fs.test.mjs tests/prompts.test.mjs tests/render.test.mjs tests/sandbox-modes.test.mjs tests/skills-contracts.test.mjs tests/structured-output.test.mjs tests/version-sync.test.mjs",
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
     "uninstall:codex": "node scripts/installer-cli.mjs uninstall",

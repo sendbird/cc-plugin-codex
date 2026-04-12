@@ -12,8 +12,8 @@ Foreground rescue responses must be that subagent's output verbatim.
 
 Use this skill when the user wants Claude Code to investigate, implement, or continue substantial work in this repository.
 
-Resolve `<plugin-root>` as two directories above this skill file. The companion entrypoint is:
-`node "<plugin-root>/scripts/claude-companion.mjs" task ...`
+Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
+`node "<installed-plugin-root>/scripts/claude-companion.mjs" task ...`
 
 Raw slash-command arguments:
 `$ARGUMENTS`
@@ -38,7 +38,7 @@ Main-thread routing rules:
 - Default to `--write` unless the user explicitly wants read-only behavior or only review, diagnosis, or research without edits.
 - If `--resume` or `--resume-last` is present, continue the latest tracked Claude Code task. If `--fresh` is present, start a new task.
 - If none of `--resume`, `--resume-last`, or `--fresh` is present, first run:
-  `node "<plugin-root>/scripts/claude-companion.mjs" task-resume-candidate --json`
+  `node "<installed-plugin-root>/scripts/claude-companion.mjs" task-resume-candidate --json`
 - If that helper reports `available: true`, ask the user once whether to continue the current Claude Code thread or start a new one.
 - Use exactly these two choices:
   - `Continue current Claude Code thread`
@@ -53,6 +53,7 @@ Main-thread routing rules:
 
 Subagent launch:
 - By default, use Codex's `spawn_agent` tool with `agent_type: "default"`.
+- Never satisfy background rescue by launching `claude-companion.mjs task` itself as a detached shell process. Do not use `&`, `nohup`, detached `spawn`, or any equivalent direct background process launch from the parent.
 - If a legacy request still includes `--builtin-agent`, treat it as a compatibility alias for the default built-in path. It should not change behavior.
 - Prefer `fork_context: false` for the built-in rescue child. The parent should pass a self-contained forwarding message instead of replaying the full parent thread by default.
 - Only consider `fork_context: true` as a last resort for a short follow-up where essential context truly cannot be summarized. Avoid it for large or long-lived threads because it can exhaust the child context window.
@@ -64,18 +65,17 @@ Subagent launch:
 - Remove `--background` and `--wait` before spawning the subagent. Those flags control only whether the main thread waits on the subagent.
 - Pass only the routing and task arguments that actually belong to `claude-companion.mjs task`.
 - If the free-text task begins with `/`, preserve it verbatim in the spawned subagent request. Do not strip the slash or rewrite it into a local Codex command.
-- Add an internal `--owner-session-id <parent-session-id>` routing flag when spawning the subagent so tracked Claude Code jobs stay attached to the user-facing parent session for `$cc:status` / `$cc:result`.
-- If the rescue is running in background through the built-in path and parent wake-up is desired, the parent should first reserve a task job id by running:
-  `node "<plugin-root>/scripts/claude-companion.mjs" task-reserve-job --json`
+- Before spawning the built-in child, capture the task job id plus routing context in one call:
+  `node "<installed-plugin-root>/scripts/claude-companion.mjs" background-routing-context --kind task --json`
+- If that helper returns a non-empty `ownerSessionId`, include `--owner-session-id <owner-session-id>` in the companion command so tracked Claude Code jobs stay attached to the user-facing parent session for `$cc:status` / `$cc:result`.
+- If it returns an empty `ownerSessionId`, omit `--owner-session-id` entirely. Never leave an empty routing placeholder such as `--owner-session-id  --job-id`.
 - If that helper returns a non-empty `jobId`, pass it into the companion command as an internal `--job-id <reserved-job-id>` routing flag.
 - Add an internal companion routing flag that reflects whether the user will see this result in the current turn:
   - Foreground rescue must add `--view-state on-success`
   - Background rescue must add `--view-state defer`
 - Any user-supplied `--model` flag is for the Claude companion only and must be forwarded unchanged to `task`.
-- If the rescue is running in background through the built-in path, the parent should first capture its own thread id by running:
-  `node -e "process.stdout.write(process.env.CODEX_THREAD_ID || '')"`
-- If that command returns a non-empty thread id, pass it into the child prompt as the parent thread id for one-shot completion notification.
-- If it returns empty output or fails, continue without parent wake-up instead of blocking the rescue.
+- If that helper returns a non-empty `parentThreadId`, pass it into the child prompt as the parent thread id for one-shot completion notification.
+- If it returns an empty `parentThreadId`, continue without parent wake-up instead of blocking the rescue.
 - This parent wake-up attempt is now the default for background built-in rescue on persistent Codex/Desktop threads. It is still best-effort and should silently degrade on one-shot `codex exec` runs.
 - For the built-in rescue path, the parent thread owns prompt shaping. The built-in child should stay a pure executor.
 - If the built-in rescue request is vague, chatty, or a follow-up, the parent may tighten only the task text before composing the exact companion command.
@@ -109,7 +109,7 @@ Subagent launch:
   - single quotes, backticks, or XML-style blocks such as `<task>` / `<output_contract>`
   - long concrete requests where inline shell quoting would be brittle
 - When using a prompt file, preserve the exact resolved task text byte-for-byte in that file and point the companion command at that file with an absolute `--prompt-file` path.
-- Prefer a temporary path outside the repository checkout, for example under `/tmp`, so rescue prompt staging does not dirty the repo.
+- Prefer a temporary path outside the repository checkout, for example under the OS temp directory such as `/tmp` on POSIX systems, so rescue prompt staging does not dirty the repo.
 - Materialize that prompt file with a normal file-write tool or other structured write path. Do not try to generate it by re-embedding the long task text inside another fragile one-line shell string.
 - If the user is not satisfied with a built-in rescue result, the parent should treat the next rescue request as a follow-up and prefer `--resume` or `--resume-last` with a short delta instruction when a resumable Claude Code session exists.
 - The built-in rescue path must use a compact strict forwarding message. It must:
@@ -118,7 +118,9 @@ Subagent launch:
   - for foreground rescue only, tell the child to return that command's stdout text exactly, with no preamble, summary, code fence, trimming, normalization, or punctuation changes
   - tell the child to ignore stderr progress chatter such as `[cc] ...` lines and preserve only the stdout-equivalent final result text
   - if a parent thread id is provided for experimental background notification, allow one extra `send_input` call after a successful shell result and before finishing
+  - the child prompt must mention the tool name `send_input` literally; do not replace it with a vague instruction like "send a message to the parent"
   - that `send_input` call must target the provided parent thread id, must happen at most once, and must not run on failure paths
+  - that `send_input` call should use the exact tool shape `send_input({ target: <parent-thread-id>, message: <steering-message> })` with no extra prose payload
   - if the parent provided a non-empty parent thread id, do not silently drop the completion notification path from the child prompt
   - that `send_input` message should use a short user-facing template that steers the parent toward explicit result retrieval instead of inlining the raw result
   - if a reserved companion job id is available, use this exact high-level shape for the notification message:

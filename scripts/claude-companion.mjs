@@ -118,6 +118,8 @@ function printUsage() {
       "  node scripts/claude-companion.mjs status [job-id] [--all] [--json]",
       "  node scripts/claude-companion.mjs result [job-id] [--json]",
       "  node scripts/claude-companion.mjs cancel [job-id] [--json]",
+      "  node scripts/claude-companion.mjs session-routing-context [--cwd <path>] [--json]",
+      "  node scripts/claude-companion.mjs background-routing-context --kind <review|task> [--cwd <path>] [--json]",
       "  node scripts/claude-companion.mjs task-resume-candidate [--json]",
       "  node scripts/claude-companion.mjs task-reserve-job [--json]",
       "  node scripts/claude-companion.mjs review-reserve-job [--json]"
@@ -131,7 +133,7 @@ function printUsage() {
 
 function outputResult(value, asJson) {
   if (asJson) {
-    console.log(JSON.stringify(value, null, 2));
+    console.log(JSON.stringify(value, redactOutputReplacer, 2));
   } else {
     process.stdout.write(typeof value === "string" ? value : JSON.stringify(value, null, 2));
   }
@@ -139,6 +141,13 @@ function outputResult(value, asJson) {
 
 function outputCommandResult(payload, rendered, asJson) {
   outputResult(asJson ? payload : rendered, asJson);
+}
+
+function redactOutputReplacer(key, value) {
+  if (key === "logFile") {
+    return undefined;
+  }
+  return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,22 +174,56 @@ function resolveExplicitJobId(value, workspaceRoot) {
   if (value == null || String(value).trim() === "") {
     return null;
   }
-  const explicitJobId = sanitizeId(String(value).trim(), "job ID");
-  if (readStoredJob(workspaceRoot, explicitJobId)) {
-    throw new Error(`Claude Code job id ${explicitJobId} already exists.`);
+  const explicitJobId = String(value).trim();
+  if (explicitJobId.startsWith("--")) {
+    throw new Error(`Invalid job ID: ${explicitJobId}`);
   }
-  if (!fs.existsSync(resolveReservedJobFile(workspaceRoot, explicitJobId))) {
+  const safeJobId = sanitizeId(explicitJobId, "job ID");
+  if (readStoredJob(workspaceRoot, safeJobId)) {
+    throw new Error(`Claude Code job id ${safeJobId} already exists.`);
+  }
+  if (!fs.existsSync(resolveReservedJobFile(workspaceRoot, safeJobId))) {
     throw new Error(
-      `Claude Code job id ${explicitJobId} is not reserved. Reserve one with the companion reserve-job helper before reusing it.`
+      `Claude Code job id ${safeJobId} is not reserved. Reserve one with the companion reserve-job helper before reusing it.`
     );
   }
-  return explicitJobId;
+  return safeJobId;
 }
 
 function resolveOwnerSessionId(value) {
   const trimmed = value == null ? "" : String(value).trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith("--")) {
+    throw new Error(`Invalid session ID: ${trimmed}`);
+  }
   return sanitizeId(trimmed, "session ID");
+}
+
+function resolveParentThreadId() {
+  const threadId = String(process.env.CODEX_THREAD_ID ?? "").trim();
+  if (!threadId) {
+    return null;
+  }
+  if (threadId.startsWith("--")) {
+    return null;
+  }
+  try {
+    return sanitizeId(threadId, "parent thread ID");
+  } catch {
+    return null;
+  }
+}
+
+function buildSessionRoutingContext(cwd) {
+  const workspaceRoot = resolveWorkspaceRoot(cwd);
+  return {
+    workspaceRoot,
+    ownerSessionId:
+      resolveOwnerSessionId(
+        process.env[SESSION_ID_ENV] ?? getCurrentSession(workspaceRoot) ?? null
+      ),
+    parentThreadId: resolveParentThreadId(),
+  };
 }
 
 function alignCurrentSessionToOwner(workspaceRoot, ownerSessionId) {
@@ -1492,8 +1535,9 @@ function handleTaskResumeCandidate(argv) {
   });
 
   const cwd = resolveCommandCwd(options);
-  const workspaceRoot = resolveCommandWorkspace(options);
-  const sessionId = process.env[SESSION_ID_ENV] ?? getCurrentSession(workspaceRoot) ?? null;
+  const routing = buildSessionRoutingContext(cwd);
+  const workspaceRoot = routing.workspaceRoot;
+  const sessionId = routing.ownerSessionId;
   const jobs = sortJobsNewestFirst(listJobs(workspaceRoot));
   const candidate =
     sessionId == null
@@ -1528,6 +1572,45 @@ function handleTaskResumeCandidate(argv) {
   const rendered = candidate
     ? `Resumable task found: ${candidate.id} (${candidate.status}).\n`
     : "No resumable task found for this session.\n";
+  outputCommandResult(payload, rendered, options.json);
+}
+
+function handleSessionRoutingContext(argv) {
+  const { options } = parseCommandInput(argv, {
+    valueOptions: ["cwd"],
+    booleanOptions: ["json"],
+  });
+
+  const cwd = resolveCommandCwd(options);
+  const payload = buildSessionRoutingContext(cwd);
+  const rendered =
+    `Owner session: ${payload.ownerSessionId ?? "(none)"}\n` +
+    `Parent thread: ${payload.parentThreadId ?? "(none)"}\n`;
+  outputCommandResult(payload, rendered, options.json);
+}
+
+function handleBackgroundRoutingContext(argv) {
+  const { options } = parseCommandInput(argv, {
+    valueOptions: ["cwd", "kind"],
+    booleanOptions: ["json"],
+  });
+
+  const kind = String(options.kind ?? "").trim().toLowerCase();
+  const prefix = kind === "review" ? "review" : kind === "task" ? "task" : null;
+  if (!prefix) {
+    throw new Error("background-routing-context requires --kind review or --kind task.");
+  }
+
+  const cwd = resolveCommandCwd(options);
+  const workspaceRoot = resolveCommandWorkspace({ cwd });
+  const payload = {
+    ...buildSessionRoutingContext(cwd),
+    jobId: reserveUniqueJobId(workspaceRoot, prefix, prefix),
+  };
+  const rendered =
+    `Job: ${payload.jobId}\n` +
+    `Owner session: ${payload.ownerSessionId ?? "(none)"}\n` +
+    `Parent thread: ${payload.parentThreadId ?? "(none)"}\n`;
   outputCommandResult(payload, rendered, options.json);
 }
 
@@ -1669,6 +1752,12 @@ async function main() {
       break;
     case "result":
       handleResult(argv);
+      break;
+    case "session-routing-context":
+      handleSessionRoutingContext(argv);
+      break;
+    case "background-routing-context":
+      handleBackgroundRoutingContext(argv);
       break;
     case "task-resume-candidate":
       handleTaskResumeCandidate(argv);
