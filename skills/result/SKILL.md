@@ -7,8 +7,8 @@ description: 'Show the stored final output for a finished Claude Code job in thi
 
 Use this skill when the user wants the stored final output for a finished Claude Code job.
 
-Resolve `<plugin-root>` as two directories above this skill file, then run:
-`node "<plugin-root>/scripts/claude-companion.mjs" result $ARGUMENTS`
+Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
+`node "<installed-plugin-root>/scripts/claude-companion.mjs" result $ARGUMENTS`
 
 Supported arguments: `[job-id]`
 

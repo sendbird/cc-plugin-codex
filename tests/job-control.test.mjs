@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import {
   sortJobsNewestFirst,
@@ -26,10 +27,7 @@ import {
   resolveJobLogFile,
 } from "../scripts/lib/state.mjs";
 
-const PROJECT_CWD = path.resolve(
-  new URL(".", import.meta.url).pathname,
-  ".."
-);
+const PROJECT_CWD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function createTempGitRepo() {
   const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "jc-session-"));

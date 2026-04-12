@@ -39,7 +39,16 @@ export function parseArgs(argv, config = {}) {
 
       if (valueOptions.has(key)) {
         const nextValue = inlineValue ?? argv[index + 1];
-        if (nextValue === undefined) {
+        if (
+          nextValue === undefined ||
+          (inlineValue === undefined &&
+            isRecognizedOptionToken(
+              nextValue,
+              valueOptions,
+              booleanOptions,
+              aliasMap
+            ))
+        ) {
           throw new Error(`Missing value for --${rawKey}`);
         }
         options[key] = nextValue;
@@ -63,7 +72,15 @@ export function parseArgs(argv, config = {}) {
 
     if (valueOptions.has(key)) {
       const nextValue = argv[index + 1];
-      if (nextValue === undefined) {
+      if (
+        nextValue === undefined ||
+        isRecognizedOptionToken(
+          nextValue,
+          valueOptions,
+          booleanOptions,
+          aliasMap
+        )
+      ) {
         throw new Error(`Missing value for -${shortKey}`);
       }
       options[key] = nextValue;
@@ -75,6 +92,22 @@ export function parseArgs(argv, config = {}) {
   }
 
   return { options, positionals };
+}
+
+function isRecognizedOptionToken(token, valueOptions, booleanOptions, aliasMap) {
+  if (!token || token === "-" || token === "--" || !token.startsWith("-")) {
+    return token === "--";
+  }
+
+  if (token.startsWith("--")) {
+    const [rawKey] = token.slice(2).split("=", 2);
+    const key = aliasMap[rawKey] ?? rawKey;
+    return valueOptions.has(key) || booleanOptions.has(key);
+  }
+
+  const shortKey = token.slice(1);
+  const key = aliasMap[shortKey] ?? shortKey;
+  return valueOptions.has(key) || booleanOptions.has(key);
 }
 
 export function splitRawArgumentString(raw) {

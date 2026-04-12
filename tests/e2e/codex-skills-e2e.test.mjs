@@ -1715,8 +1715,9 @@ describe("Codex direct-skill E2E", () => {
       userRequest,
       skillTitle: "Claude Code Review",
       expectedParentNeedles: [
-        "review-reserve-job --json",
-        "--owner-session-id <parent-session-id>",
+        "background-routing-context --kind review --json",
+        "--owner-session-id <owner-session-id>",
+        "Never satisfy background review by running the companion command itself with shell backgrounding",
         "allow one extra `send_input` call after a successful shell result",
         "must target the provided parent thread id",
         "do not silently drop the completion notification path from the child prompt",
@@ -1858,8 +1859,9 @@ describe("Codex direct-skill E2E", () => {
       userRequest,
       skillTitle: "Claude Code Adversarial Review",
       expectedParentNeedles: [
-        "review-reserve-job --json",
-        "--owner-session-id <parent-session-id>",
+        "background-routing-context --kind review --json",
+        "--owner-session-id <owner-session-id>",
+        "Never satisfy background adversarial review by running the companion command itself with shell backgrounding",
         "allow one extra `send_input` call after a successful shell result",
         "must target the provided parent thread id",
         "do not silently drop the completion notification path from the child prompt",

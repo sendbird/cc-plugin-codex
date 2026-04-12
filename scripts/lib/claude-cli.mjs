@@ -10,8 +10,9 @@
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { resolvePluginRuntimeRoot } from "./codex-paths.mjs";
+import { normalizePathSlashes, resolvePluginRuntimeRoot } from "./codex-paths.mjs";
 import { getProcessIdentity, validateProcessIdentity } from "./process.mjs";
 
 const CLAUDE_BIN = "claude";
@@ -20,6 +21,7 @@ export const MAX_STREAM_PARSER_PARSE_ERRORS = 50;
 export const MAX_STREAM_PARSER_TOOL_USES = 256;
 export const MAX_STREAM_PARSER_TOUCHED_FILES = 256;
 export const MAX_STDERR_BYTES = 64 * 1024;
+export const SANDBOX_TEMP_DIR = normalizePathSlashes(path.resolve(os.tmpdir()));
 
 function pushBoundedTail(list, value, maxEntries) {
   list.push(value);
@@ -371,7 +373,7 @@ export const SANDBOX_READ_ONLY_TOOLS = [
  * Sandbox presets matching Codex sandbox modes.
  *
  * read-only:       no writes at all, no network from Bash.
- * workspace-write: Bash can write to cwd + /tmp only, no network from Bash.
+ * workspace-write: Bash can write to cwd + OS temp dir only, no network from Bash.
  *                  All tools allowed (no allowedTools restriction).
  */
 export const SANDBOX_SETTINGS = {
@@ -380,7 +382,7 @@ export const SANDBOX_SETTINGS = {
       enabled: true,
       autoAllowBashIfSandboxed: true,
       filesystem: {
-        allowWrite: ["/tmp"],
+        allowWrite: [SANDBOX_TEMP_DIR],
       },
       network: {
         allowedDomains: [],
@@ -392,7 +394,7 @@ export const SANDBOX_SETTINGS = {
       enabled: true,
       autoAllowBashIfSandboxed: true,
       filesystem: {
-        allowWrite: [".", "/tmp"],
+        allowWrite: [".", SANDBOX_TEMP_DIR],
       },
       network: {
         allowedDomains: [],

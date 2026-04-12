@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   isProbablyText,
 } from "../scripts/lib/fs.mjs";
+import { samePath } from "../scripts/lib/codex-paths.mjs";
 
 // ---------------------------------------------------------------------------
 // isProbablyText
@@ -45,5 +46,19 @@ describe("isProbablyText", () => {
     textPart[4097 - 1] = 0; // null at position 4096 (beyond sample)
     // The function samples subarray(0, min(len, 4096)) = first 4096 bytes, all 'A'
     assert.equal(isProbablyText(textPart), true);
+  });
+});
+
+describe("samePath", () => {
+  it("matches identical resolved paths", () => {
+    assert.equal(samePath("/tmp/example", "/tmp/example"), true);
+  });
+
+  it("normalizes dot segments before comparison", () => {
+    assert.equal(samePath("/tmp/example/../example", "/tmp/example"), true);
+  });
+
+  it("treats Windows path casing as equivalent on win32", () => {
+    assert.equal(samePath("C:\\Users\\Jin\\Repo", "c:\\users\\jin\\repo", "win32"), true);
   });
 });

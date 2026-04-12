@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import {
   SESSION_ID_ENV,
@@ -21,7 +22,7 @@ import {
 } from "../scripts/lib/tracked-jobs.mjs";
 import { clearCurrentSession, ensureStateDir, readJobFile, resolveJobFile, resolveJobLogFile, setCurrentSession, writeJobFile } from "../scripts/lib/state.mjs";
 
-const PROJECT_CWD = path.resolve(new URL(".", import.meta.url).pathname, "..");
+const PROJECT_CWD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function createTempGitRepo() {
   const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tracked-jobs-session-"));

@@ -7,7 +7,30 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  core-cross-platform:
+    name: Core checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check:version-sync
+      - run: npm run check:changelog
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:cross-platform
+
+  linux-full:
+    name: Full CI (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

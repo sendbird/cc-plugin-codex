@@ -7,8 +7,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadPromptTemplate, interpolateTemplate } from "../scripts/lib/prompts.mjs";
+
+const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(TESTS_DIR, "..");
 
 // ---------------------------------------------------------------------------
 // interpolateTemplate
@@ -111,14 +115,12 @@ describe("loadPromptTemplate", () => {
   });
 
   it("works with the actual project prompts directory", () => {
-    const projectRoot = path.resolve(new URL(".", import.meta.url).pathname, "..");
-    // Check if any prompt files exist
-    const promptDir = path.join(projectRoot, "prompts");
+    const promptDir = path.join(PROJECT_ROOT, "prompts");
     if (fs.existsSync(promptDir)) {
       const files = fs.readdirSync(promptDir).filter((f) => f.endsWith(".md"));
       if (files.length > 0) {
         const name = files[0].replace(".md", "");
-        const content = loadPromptTemplate(projectRoot, name);
+        const content = loadPromptTemplate(PROJECT_ROOT, name);
         assert.ok(typeof content === "string");
         assert.ok(content.length > 0);
       }
@@ -126,8 +128,7 @@ describe("loadPromptTemplate", () => {
   });
 
   it("keeps the stop-review-gate prompt aligned to Codex wording", () => {
-    const projectRoot = path.resolve(new URL(".", import.meta.url).pathname, "..");
-    const content = loadPromptTemplate(projectRoot, "stop-review-gate");
+    const content = loadPromptTemplate(PROJECT_ROOT, "stop-review-gate");
     assert.match(content, /previous Codex turn/);
     assert.match(content, /\{\{PREVIOUS_RESPONSE_BLOCK\}\}/);
     assert.match(content, /untrusted model output/i);
@@ -136,8 +137,7 @@ describe("loadPromptTemplate", () => {
   });
 
   it("frames adversarial-review prompt inputs as untrusted data", () => {
-    const projectRoot = path.resolve(new URL(".", import.meta.url).pathname, "..");
-    const content = loadPromptTemplate(projectRoot, "adversarial-review");
+    const content = loadPromptTemplate(PROJECT_ROOT, "adversarial-review");
     assert.match(content, /untrusted user input/i);
     assert.match(content, /untrusted repository data/i);
     assert.match(content, /<user_focus>/);

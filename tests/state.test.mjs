@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 // State paths are workspace-hash based and resolveWorkspaceRoot() shells out to
 // git, so most tests use a real git repo cwd. A dedicated subprocess test below
@@ -43,10 +44,7 @@ import {
 } from "../scripts/lib/state.mjs";
 
 // We'll use the project root as a known git-repo cwd for workspace resolution.
-const PROJECT_CWD = path.resolve(
-  new URL(".", import.meta.url).pathname,
-  ".."
-);
+const PROJECT_CWD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_MODULE_URL = new URL("../scripts/lib/state.mjs", import.meta.url).href;
 
 function createTempGitRepo() {

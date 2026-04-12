@@ -35,6 +35,7 @@ That includes:
 - Session-scoped tracked jobs with status, result, and cancel commands
 - Background completion nudges that steer you to the right `$cc:result <job-id>`
 - An optional stop-time review gate
+- GitHub CI coverage on Windows, macOS, and Linux
 
 It follows the shape of [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) but runs in the opposite direction.
 
@@ -52,6 +53,9 @@ That's the entire install. It:
 - Falls back to config-based activation on older Codex builds
 - Enables `codex_hooks = true`
 - Installs lifecycle, review-gate, and unread-result hooks
+
+On Windows, prefer the `npx` path above. The shell-script installer below is POSIX-only.
+The maintained CI matrix now covers Windows, macOS, and Linux. The `npx` install path is the cross-platform path we test on every release.
 
 > **Prerequisites:** Node.js 18+, Codex with hook support, and `claude` CLI installed and authenticated.
 > If you don't have the Claude CLI yet:

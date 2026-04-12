@@ -97,6 +97,26 @@ function runInstaller(command, homeDir, sourceRoot, extraEnv = {}) {
   return result;
 }
 
+function runLocalPluginInstaller(command, pluginRoot, homeDir, extraEnv = {}) {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(pluginRoot, "scripts", "local-plugin-install.mjs"), command, "--plugin-root", pluginRoot],
+    {
+      cwd: pluginRoot,
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        USERPROFILE: homeDir,
+        ...extraEnv,
+      },
+      encoding: "utf8",
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result;
+}
+
 function createFakeCodex(homeDir, codexHome = path.join(homeDir, ".codex")) {
   const scriptPath = makeTempHelper("fake-codex-app-server");
   const logPath = path.join(codexHome, "fake-codex-requests.log");
@@ -574,11 +594,18 @@ describe("installer-cli", () => {
     const hooksFile = path.join(homeDir, ".codex", "hooks.json");
     const fallbackSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
     const fallbackPromptPath = path.join(homeDir, ".codex", "prompts", "cc-review.md");
+    const installedReviewSkill = path.join(installDir, "skills", "review", "SKILL.md");
+    const cachedReviewSkill = path.join(cacheDir, "skills", "review", "SKILL.md");
+    const normalizedInstallDir = installDir.replace(/\\/g, "/");
 
     assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
     assert.ok(fs.existsSync(path.join(cacheDir, "skills", "review", "SKILL.md")));
     assert.ok(!fs.existsSync(fallbackSkillPath));
     assert.ok(!fs.existsSync(fallbackPromptPath));
+    assert.ok(fs.readFileSync(installedReviewSkill, "utf8").includes(normalizedInstallDir));
+    assert.doesNotMatch(fs.readFileSync(installedReviewSkill, "utf8"), /<installed-plugin-root>/i);
+    assert.ok(fs.readFileSync(cachedReviewSkill, "utf8").includes(normalizedInstallDir));
+    assert.doesNotMatch(fs.readFileSync(cachedReviewSkill, "utf8"), /<installed-plugin-root>/i);
 
     const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
     assert.equal(marketplace.plugins[0].name, "cc");
@@ -600,6 +627,22 @@ describe("installer-cli", () => {
       requests.some((request) => request.method === "plugin/install"),
       "installer should use Codex's official plugin/install path"
     );
+  });
+
+  it("materializes installed skill paths for a direct local checkout install", () => {
+    const homeDir = makeTempHome();
+    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
+    const fakeCodex = createFakeCodex(homeDir);
+    copyFixture(installDir);
+
+    runLocalPluginInstaller("install", installDir, homeDir, fakeCodex.env);
+
+    const installedReviewSkill = path.join(installDir, "skills", "review", "SKILL.md");
+    const skillText = fs.readFileSync(installedReviewSkill, "utf8");
+    const normalizedInstallDir = installDir.replace(/\\/g, "/");
+
+    assert.ok(skillText.includes(normalizedInstallDir));
+    assert.doesNotMatch(skillText, /<installed-plugin-root>/i);
   });
 
   it("installs successfully when CODEX_HOME is outside the user's home directory", () => {
