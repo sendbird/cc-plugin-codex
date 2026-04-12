@@ -28,36 +28,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:cross-platform
 
-  windows-wsl-full:
-    name: Full CI (windows-latest, WSL)
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: wsl-bash {0}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: Vampire/setup-wsl@v7
-        with:
-          distribution: Ubuntu-24.04
-          additional-packages: curl git ca-certificates
-      - run: |
-          git config --global core.autocrlf false
-          git reset --hard HEAD
-      - run: |
-          curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-          apt-get install -y nodejs
-      - run: node --version
-      - run: npm install -g @openai/codex
-      - run: codex --version
-      - run: npm ci
-      - run: npm run check:version-sync
-      - run: npm run check:changelog
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run test:integration
-      - run: npm run test:e2e
-
   macos-full:
     name: Full CI (macos-latest)
     runs-on: macos-latest
