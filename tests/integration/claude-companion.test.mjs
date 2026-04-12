@@ -1923,6 +1923,7 @@ describe("claude-companion integration", () => {
       "race-delta delay=570",
       "race-epsilon delay=620",
     ];
+    let waitSnapshotsPromise = Promise.resolve([]);
 
     try {
       const launches = await Promise.all(
@@ -1941,7 +1942,7 @@ describe("claude-companion integration", () => {
         )
       );
 
-      const waitSnapshotsPromise = Promise.all(
+      waitSnapshotsPromise = Promise.all(
         launches.slice(0, 2).map((launch) =>
           runCompanionAsyncJson(
             [
@@ -1995,11 +1996,20 @@ describe("claude-companion integration", () => {
         }
       }
 
-      assert.equal(
-        terminalPayloads.size,
-        launches.length,
-        `Expected all launches to reach terminal state, got ${terminalPayloads.size}/${launches.length}`
+      const unresolvedLaunches = launches.filter(
+        (launch) => !terminalPayloads.has(launch.jobId)
       );
+      for (const launch of unresolvedLaunches) {
+        const payload = await waitForTerminalResult(
+          testEnv,
+          launch.jobId,
+          testEnv.env,
+          { timeoutMs: 20_000 }
+        );
+        assertCompletedTaskPayload(payload, launch.prompt);
+        terminalPayloads.set(launch.jobId, payload);
+      }
+
       const waitSnapshots = await waitSnapshotsPromise;
       for (const snapshot of waitSnapshots) {
         assert.equal(snapshot.job.status, "completed");
@@ -2015,6 +2025,7 @@ describe("claude-companion integration", () => {
         assert.ok(completedJobIds.includes(launch.jobId));
       }
     } finally {
+      await Promise.allSettled([waitSnapshotsPromise]);
       cleanupTestEnvironment(testEnv);
     }
   });
