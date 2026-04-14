@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.8
+
+- Clarify the routing boundary between `$cc:review`, `$cc:adversarial-review`, and `$cc:rescue`, including the rule that ordinary code-review requests default to `review`, stronger scrutiny plus custom focus text belongs to `adversarial-review`, and rescue is only for Claude-owned follow-through work.
+- Add E2E coverage that injects both review skills together and verifies the focus-text distinction is surfaced to the parent turn while the adversarial focus path still reaches Claude end to end.
+- Refresh the macOS integration concurrency test so aggressive concurrent polling no longer flakes when some jobs finish slightly later than the initial polling window.
+- Update development dependencies with the merged Dependabot patch bumps for `@types/node` and `globals`.
+
 ## v1.0.7
 
 - Add GitHub CI coverage across Windows, macOS, and Linux, with a portable cross-platform test suite plus Linux-only full integration/E2E coverage.

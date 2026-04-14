@@ -22,9 +22,11 @@ test("review skills keep background execution outside the companion command", ()
   const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
 
   assert.match(review, /Do not derive the companion path from this skill file or any cache directory/i);
-  assert.match(review, /Choose `\$cc:review` only for straightforward review requests where the user mainly wants correctness findings on the current diff/i);
-  assert.match(review, /If the user wants stronger challenge on design, rollout risk, migration risk, configuration behavior, template mismatch elimination, or any custom focus text, route to `\$cc:adversarial-review` instead/i);
+  assert.match(review, /Use `\$cc:review` as the default when the user asks for code review, asks you to have Claude review something, or wants a second review pass without explicitly asking for stronger adversarial scrutiny/i);
+  assert.match(review, /If the user asks for stronger challenge on design, tradeoffs, rollout risk, migration risk, configuration behavior, or provides custom review focus text, route to `\$cc:adversarial-review` instead/i);
   assert.match(review, /If the user wants Claude Code to investigate, validate by changing code, or actually fix\/implement something, route to `\$cc:rescue` instead/i);
+  assert.match(review, /If the overall request is "you review it too, also ask Claude to review in the background, then you aggregate and fix it", keep the delegated Claude part on `\$cc:review` unless the user explicitly asks for a harsher or more adversarial review/i);
+  assert.match(review, /`\$cc:review` does not accept custom focus text/i);
   assert.match(review, installedRootPattern);
   assert.match(review, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(review, /Strip them before calling the companion command/i);
@@ -63,9 +65,11 @@ test("review skills keep background execution outside the companion command", ()
   assert.doesNotMatch(review, /claude-companion\.mjs" review \$ARGUMENTS/i);
 
   assert.match(adversarial, /Do not derive the companion path from this skill file or any cache directory/i);
-  assert.match(adversarial, /Prefer `\$cc:adversarial-review` over `\$cc:review` when the change touches configuration, infrastructure, templating, rollout mechanics, migrations, safety controls, or "this should remove mismatch\/drift" style refactors/i);
-  assert.match(adversarial, /Use it even without extra focus text when the real question is "did this actually eliminate the risk or just move it around\?"/i);
+  assert.match(adversarial, /Do not treat `\$cc:adversarial-review` as the default review path/i);
+  assert.match(adversarial, /Good triggers include requests to challenge the design, challenge tradeoffs, pressure-test a risky change, question whether a migration\/config\/template change really removed the risk, or honor custom focus text that asks for harsher review/i);
   assert.match(adversarial, /If the user wants Claude Code to go beyond review and perform investigation, validation edits, or implementation work, route to `\$cc:rescue` instead/i);
+  assert.match(adversarial, /If the user asks for a local review plus a separate Claude background review and then wants the main Codex thread to aggregate the findings and apply fixes, keep the delegated Claude portion on `\$cc:review` unless the user explicitly asks for the adversarial angle/i);
+  assert.match(adversarial, /Unlike `\$cc:review`, this skill accepts custom focus text after the flags/i);
   assert.match(adversarial, installedRootPattern);
   assert.match(adversarial, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(adversarial, /Strip them before calling the companion command/i);
@@ -111,6 +115,7 @@ test("rescue skill keeps --background and --wait as host-side controls only", ()
   assert.match(rescue, /Do not derive the companion path from this skill file or any cache directory/i);
   assert.match(rescue, /Prefer `\$cc:rescue` when the user wants Claude Code to diagnose the issue, validate a risky change by actually editing or testing, apply fixes from a prior review, or carry a task forward across multiple steps/i);
   assert.match(rescue, /Do not use rescue for "just review this diff" unless the user also wants follow-through work beyond review findings/i);
+  assert.match(rescue, /Do not use rescue merely because the main Codex thread plans to fix things after combining its own review with a separate Claude review/i);
   assert.match(rescue, installedRootPattern);
   assert.match(rescue, /`--background` and `--wait` are Codex-side execution controls only/i);
   assert.match(rescue, /Never satisfy background rescue by launching `claude-companion\.mjs task` itself as a detached shell process/i);

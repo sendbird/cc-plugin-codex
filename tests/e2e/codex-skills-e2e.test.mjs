@@ -334,6 +334,23 @@ function buildSkillPrompt(name, skillPath, userRequest) {
   ].join("\n");
 }
 
+function buildMultiSkillPrompt(skills, userRequest) {
+  return [
+    ...skills.flatMap(({ name, path: skillPath }) => {
+      const skillBody = fs.readFileSync(skillPath, "utf8").trim();
+      return [
+        "<skill>",
+        `<name>${name}</name>`,
+        `<path>${skillPath}</path>`,
+        skillBody,
+        "</skill>",
+        "",
+      ];
+    }),
+    userRequest,
+  ].join("\n");
+}
+
 function eventCreated(id) {
   return {
     type: "response.created",
@@ -1839,6 +1856,68 @@ describe("Codex direct-skill E2E", () => {
       assert.ok(
         claudeInvocations.some((entry) => entry.prompt.includes("focus on race conditions")),
         "adversarial review e2e should preserve the user focus text in the Claude prompt"
+      );
+    } finally {
+      await provider.close();
+      cleanupEnvironment(testEnv);
+    }
+  });
+
+  it("injects review-versus-adversarial focus routing guidance when both skills are available", async (t) => {
+    if (!codexAvailable()) {
+      t.skip("codex CLI is not available in this environment");
+      return;
+    }
+
+    const testEnv = createEnvironment();
+    const workspaceDir = path.join(testEnv.rootDir, "focus-routing-workspace");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    setupGitWorkspace(workspaceDir);
+    fs.writeFileSync(
+      path.join(workspaceDir, "app.js"),
+      "export function value() {\n  return 7;\n}\n",
+      "utf8"
+    );
+
+    const userRequest =
+      "$cc:review --wait --scope working-tree --model haiku focus on race conditions";
+    const provider = startDirectSkillProvider({
+      userRequest,
+      expectedNeedles: [
+        "`$cc:review` does not accept custom focus text",
+        "Unlike `$cc:review`, this skill accepts custom focus text after the flags",
+        "keep the delegated Claude part on `$cc:review`",
+      ],
+      shellCommands: [
+        `node ${JSON.stringify(COMPANION_SCRIPT)} adversarial-review --view-state on-success --scope working-tree --model haiku focus on race conditions`,
+      ],
+      cwd: workspaceDir,
+    });
+    testEnv.providerPort = await provider.listen();
+    installHooks(testEnv);
+    writeConfigToml(testEnv, testEnv.providerPort);
+
+    try {
+      const execResult = await runCodexExec(
+        testEnv,
+        buildMultiSkillPrompt(
+          [
+            { name: "cc:review", path: REVIEW_SKILL_PATH },
+            { name: "cc:adversarial-review", path: ADVERSARIAL_REVIEW_SKILL_PATH },
+          ],
+          userRequest
+        ),
+        { cwd: workspaceDir }
+      );
+
+      assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
+      const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8");
+      assert.match(finalMessage, /Adversarial Review/);
+
+      const claudeInvocations = readClaudeInvocations(testEnv.claudeLogFile);
+      assert.ok(
+        claudeInvocations.some((entry) => entry.prompt.includes("focus on race conditions")),
+        "focus-routing e2e should preserve the user focus text when the adversarial path is selected"
       );
     } finally {
       await provider.close();

@@ -1,15 +1,17 @@
 ---
 name: review
-description: 'Run a standard Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>. Use for straightforward correctness-oriented diff review when the user wants findings only, not custom focus text, adversarial framing, or implementation work.'
+description: 'Run a standard Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>. Use as the default path for ordinary code-review requests when the user did not explicitly ask for stronger adversarial scrutiny or for Claude to own the implementation work.'
 ---
 
 # Claude Code Review
 
 Use this skill when the user wants Claude Code to review the current working tree or a branch diff in this repository.
 
-Choose `$cc:review` only for straightforward review requests where the user mainly wants correctness findings on the current diff.
-If the user wants stronger challenge on design, rollout risk, migration risk, configuration behavior, template mismatch elimination, or any custom focus text, route to `$cc:adversarial-review` instead.
+Use `$cc:review` as the default when the user asks for code review, asks you to have Claude review something, or wants a second review pass without explicitly asking for stronger adversarial scrutiny.
+If the user asks for stronger challenge on design, tradeoffs, rollout risk, migration risk, configuration behavior, or provides custom review focus text, route to `$cc:adversarial-review` instead.
 If the user wants Claude Code to investigate, validate by changing code, or actually fix/implement something, route to `$cc:rescue` instead.
+If the overall request is "you review it too, also ask Claude to review in the background, then you aggregate and fix it", keep the delegated Claude part on `$cc:review` unless the user explicitly asks for a harsher or more adversarial review.
+`$cc:review` does not accept custom focus text. If the user wants to steer Claude toward a particular angle, question, subsystem, or risk area, that is a signal to use `$cc:adversarial-review` instead.
 
 Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
 `node "<installed-plugin-root>/scripts/claude-companion.mjs" review ...`

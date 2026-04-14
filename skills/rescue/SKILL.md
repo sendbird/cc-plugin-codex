@@ -14,6 +14,7 @@ Use this skill when the user wants Claude Code to investigate, implement, or con
 
 Prefer `$cc:rescue` when the user wants Claude Code to diagnose the issue, validate a risky change by actually editing or testing, apply fixes from a prior review, or carry a task forward across multiple steps.
 Do not use rescue for "just review this diff" unless the user also wants follow-through work beyond review findings.
+Do not use rescue merely because the main Codex thread plans to fix things after combining its own review with a separate Claude review. Rescue is only the right delegation when Claude itself is supposed to investigate, edit, test, or otherwise own the follow-through work.
 
 Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
 `node "<installed-plugin-root>/scripts/claude-companion.mjs" task ...`

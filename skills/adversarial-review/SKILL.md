@@ -1,15 +1,17 @@
 ---
 name: adversarial-review
-description: 'Run a design-challenging Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>, [focus text]. Use when the user wants stronger scrutiny, tradeoff analysis, risky-change review, or custom review focus text.'
+description: 'Run a design-challenging Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>, [focus text]. Use only when the user wants stronger scrutiny than a normal review, such as explicit tradeoff challenge, risky-change review, or custom focus text.'
 ---
 
 # Claude Code Adversarial Review
 
 Use this skill when the user wants Claude Code to challenge the implementation approach, design choices, assumptions, or tradeoffs in this repository.
 
-Prefer `$cc:adversarial-review` over `$cc:review` when the change touches configuration, infrastructure, templating, rollout mechanics, migrations, safety controls, or "this should remove mismatch/drift" style refactors.
-Use it even without extra focus text when the real question is "did this actually eliminate the risk or just move it around?"
+Do not treat `$cc:adversarial-review` as the default review path. Use it only when the user explicitly wants stronger scrutiny than a normal code review.
+Good triggers include requests to challenge the design, challenge tradeoffs, pressure-test a risky change, question whether a migration/config/template change really removed the risk, or honor custom focus text that asks for harsher review.
 If the user wants Claude Code to go beyond review and perform investigation, validation edits, or implementation work, route to `$cc:rescue` instead.
+If the user asks for a local review plus a separate Claude background review and then wants the main Codex thread to aggregate the findings and apply fixes, keep the delegated Claude portion on `$cc:review` unless the user explicitly asks for the adversarial angle.
+Unlike `$cc:review`, this skill accepts custom focus text after the flags. The moment the user wants to steer Claude toward a specific angle or risk question, prefer `$cc:adversarial-review`.
 
 Do not derive the companion path from this skill file or any cache directory. Always run the installed copy:
 `node "<installed-plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
