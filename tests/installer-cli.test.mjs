@@ -77,6 +77,40 @@ function copyFixture(sourceRoot) {
   }
 }
 
+function copyMarketplaceFixture(sourceRoot, marketplaceName = "sendbird") {
+  const marketplaceRoot = path.join(sourceRoot, "sendbird-marketplace");
+  const pluginRoot = path.join(marketplaceRoot, "plugins", "cc");
+  copyFixture(pluginRoot);
+  fs.mkdirSync(path.join(marketplaceRoot, ".agents", "plugins"), { recursive: true });
+  fs.writeFileSync(
+    path.join(marketplaceRoot, ".agents", "plugins", "marketplace.json"),
+    `${JSON.stringify(
+      {
+        name: marketplaceName,
+        interface: { displayName: "Sendbird Plugins" },
+        plugins: [
+          {
+            name: "cc",
+            source: {
+              source: "local",
+              path: "./plugins/cc",
+            },
+            policy: {
+              installation: "AVAILABLE",
+              authentication: "ON_USE",
+            },
+            category: "Coding",
+          },
+        ],
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return marketplaceRoot;
+}
+
 function runInstaller(command, homeDir, sourceRoot, extraEnv = {}) {
   const result = spawnSync(
     process.execPath,
@@ -277,6 +311,145 @@ rl.on("line", (line) => {
     env: {
       CC_PLUGIN_CODEX_EXECUTABLE: process.execPath,
       CC_PLUGIN_CODEX_APP_SERVER_ARGS_JSON: JSON.stringify([scriptPath, codexHome, logPath]),
+    },
+    logPath,
+  };
+}
+
+function createMarketplaceAwareCodex(homeDir, codexHome = path.join(homeDir, ".codex")) {
+  const scriptPath = makeTempHelper("fake-codex-app-server-marketplace");
+  const logPath = path.join(codexHome, "fake-codex-requests.log");
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import readline from "node:readline";
+
+const codexHome = ${JSON.stringify(codexHome)};
+const logPath = ${JSON.stringify(logPath)};
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+
+function readConfig(configPath) {
+  return fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf8") : "";
+}
+
+function normalizeTrailingNewline(text) {
+  return text.replace(/\\s*$/, "") + "\\n";
+}
+
+function removeSection(content, header) {
+  const lines = content.split("\\n");
+  const kept = [];
+  let skip = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (skip && trimmed.startsWith("[")) {
+      skip = false;
+    }
+    if (!skip && trimmed === header) {
+      skip = true;
+      continue;
+    }
+    if (!skip) {
+      kept.push(line);
+    }
+  }
+  return normalizeTrailingNewline(kept.join("\\n").replace(/\\n{3,}/g, "\\n\\n"));
+}
+
+function appendPluginSection(configPath, pluginId) {
+  const header = '[plugins."' + pluginId + '"]';
+  const base = removeSection(readConfig(configPath), header).replace(/\\s*$/, "");
+  const next = [header, "enabled = true", ""].join("\\n");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, (base ? base + "\\n\\n" : "") + next + "\\n", "utf8");
+}
+
+function copyPlugin(sourceRoot, destinationRoot) {
+  fs.rmSync(destinationRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(destinationRoot), { recursive: true });
+  fs.cpSync(sourceRoot, destinationRoot, { recursive: true });
+}
+
+function marketplaceRootFromPath(marketplacePath) {
+  return path.dirname(path.dirname(path.dirname(marketplacePath)));
+}
+
+function installMarketplace(sourceRoot) {
+  const marketplacePath = path.join(sourceRoot, ".agents", "plugins", "marketplace.json");
+  const marketplace = JSON.parse(fs.readFileSync(marketplacePath, "utf8"));
+  const installedRoot = path.join(codexHome, "marketplaces", marketplace.name);
+  fs.rmSync(installedRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(installedRoot), { recursive: true });
+  fs.cpSync(sourceRoot, installedRoot, { recursive: true });
+  return {
+    alreadyAdded: false,
+    installedRoot,
+    marketplaceName: marketplace.name,
+  };
+}
+
+function handleInstall(params) {
+  const marketplace = JSON.parse(fs.readFileSync(params.marketplacePath, "utf8"));
+  const plugin = marketplace.plugins.find((entry) => entry.name === params.pluginName);
+  if (!plugin) {
+    throw new Error("missing plugin in marketplace");
+  }
+  const pluginId = params.pluginName + "@" + marketplace.name;
+  const sourceRoot = path.resolve(marketplaceRootFromPath(params.marketplacePath), plugin.source.path);
+  const cacheRoot = path.join(codexHome, "plugins", "cache", marketplace.name, params.pluginName, "local");
+  copyPlugin(sourceRoot, cacheRoot);
+  appendPluginSection(path.join(codexHome, "config.toml"), pluginId);
+  return {
+    authPolicy: plugin.policy?.authentication || "ON_USE",
+    appsNeedingAuth: [],
+  };
+}
+
+function logMessage(message) {
+  fs.appendFileSync(logPath, JSON.stringify(message) + "\\n", "utf8");
+}
+
+rl.on("line", (line) => {
+  if (!line.trim()) {
+    return;
+  }
+
+  const message = JSON.parse(line);
+  logMessage(message);
+
+  if (message.method === "initialize") {
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { ok: true } }) + "\\n");
+    return;
+  }
+
+  if (message.method === "marketplace/add") {
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result: installMarketplace(message.params.source) }) + "\\n");
+    return;
+  }
+
+  if (message.method === "plugin/install") {
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result: handleInstall(message.params) }) + "\\n");
+    return;
+  }
+
+  process.stdout.write(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: message.id,
+      error: { code: -32601, message: "Method not found" },
+    }) + "\\n"
+  );
+});\n`,
+    "utf8"
+  );
+  fs.chmodSync(scriptPath, 0o755);
+
+  return {
+    env: {
+      CC_PLUGIN_CODEX_EXECUTABLE: scriptPath,
     },
     logPath,
   };
@@ -647,6 +820,68 @@ describe("installer-cli", () => {
       requests.some((request) => request.method === "plugin/install"),
       "installer should use Codex's official plugin/install path"
     );
+    assert.ok(
+      !requests.some((request) => request.method === "marketplace/add"),
+      "npx install should install the current package directly instead of redirecting through a marketplace by default"
+    );
+  });
+
+  it("prefers Codex marketplace/add when an official marketplace source is configured", () => {
+    const homeDir = makeTempHome();
+    const sourceRoot = makeTempSource();
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
+    copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
+
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
+
+    const configFile = path.join(homeDir, ".codex", "config.toml");
+    const config = fs.readFileSync(configFile, "utf8");
+    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
+    const requests = readFakeCodexLog(fakeCodex.logPath);
+    const pluginInstallRequest = requests.find((request) => request.method === "plugin/install");
+
+    assert.match(config, /\[plugins\."cc@sendbird"\]/);
+    assert.ok(
+      requests.some((request) => request.method === "marketplace/add"),
+      "installer should prefer Codex marketplace/add when a marketplace source is configured"
+    );
+    assert.equal(
+      pluginInstallRequest?.params?.marketplacePath,
+      path.join(homeDir, ".codex", "marketplaces", "sendbird", ".agents", "plugins", "marketplace.json")
+    );
+    assert.ok(
+      !fs.existsSync(marketplaceFile),
+      "official marketplace installs should not mutate the personal marketplace file"
+    );
+  });
+
+  it("falls back to the personal marketplace entry when marketplace/add is unavailable", () => {
+    const homeDir = makeTempHome();
+    const sourceRoot = makeTempSource();
+    const fakeCodex = createMethodNotFoundCodex(homeDir);
+    copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
+
+    const result = runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
+
+    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
+    const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
+    const config = fs.readFileSync(path.join(homeDir, ".codex", "config.toml"), "utf8");
+
+    assert.equal(marketplace.name, "sendbird");
+    assert.equal(marketplace.plugins[0].name, "cc");
+    assert.match(config, /\[plugins\."cc@sendbird"\]/);
+    assert.match(result.stderr, /marketplace\/add unavailable/i);
+    assert.match(result.stderr, /config fallback/i);
   });
 
   it("materializes installed skill paths for a direct local checkout install", () => {
@@ -849,11 +1084,28 @@ describe("installer-cli", () => {
     );
 
     runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+
+    const marketplacePath = path.join(homeDir, ".agents", "plugins", "marketplace.json");
+    const marketplaceBeforeUninstall = JSON.parse(fs.readFileSync(marketplacePath, "utf8"));
+    marketplaceBeforeUninstall.plugins.push({
+      name: "cc",
+      source: { source: "local", path: "./stale/cc" },
+      policy: { installation: "AVAILABLE", authentication: "ON_USE" },
+      category: "Coding",
+    });
+    fs.writeFileSync(marketplacePath, JSON.stringify(marketplaceBeforeUninstall, null, 2) + "\n", "utf8");
+
+    fs.appendFileSync(
+      path.join(homeDir, ".codex", "config.toml"),
+      '\n[plugins."cc@sendbird"]\nenabled = true\n',
+      "utf8"
+    );
+
     runInstaller("uninstall", homeDir, sourceRoot, fakeCodex.env);
 
     const installDir = path.join(homeDir, ".codex", "plugins", "cc");
     const marketplace = JSON.parse(
-      fs.readFileSync(path.join(homeDir, ".agents", "plugins", "marketplace.json"), "utf8")
+      fs.readFileSync(marketplacePath, "utf8")
     );
     const config = fs.readFileSync(path.join(homeDir, ".codex", "config.toml"), "utf8");
     const hooks = JSON.parse(fs.readFileSync(path.join(homeDir, ".codex", "hooks.json"), "utf8"));
@@ -863,7 +1115,92 @@ describe("installer-cli", () => {
     assert.equal(marketplace.plugins[0].name, "other");
     assert.match(config, /\[plugins\."github@openai-curated"\]/);
     assert.doesNotMatch(config, /\[plugins\."cc@local-plugins"\]/);
+    assert.doesNotMatch(config, /\[plugins\."cc@sendbird"\]/);
     assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "echo custom-hook");
+  });
+
+  it("removes versioned marketplace cache entries during uninstall", () => {
+    const homeDir = makeTempHome();
+    const sourceRoot = makeTempSource();
+    const fakeCodex = createFakeCodex(homeDir);
+    copyFixture(sourceRoot);
+
+    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+
+    const versionedCacheDir = path.join(
+      homeDir,
+      ".codex",
+      "plugins",
+      "cache",
+      "sendbird",
+      "cc",
+      "1.0.8"
+    );
+    fs.mkdirSync(path.join(versionedCacheDir, "skills"), { recursive: true });
+    fs.appendFileSync(
+      path.join(homeDir, ".codex", "config.toml"),
+      '\n[plugins."cc@sendbird"]\nenabled = true\n',
+      "utf8"
+    );
+
+    runInstaller("uninstall", homeDir, sourceRoot, fakeCodex.env);
+
+    assert.ok(!fs.existsSync(versionedCacheDir));
+    assert.ok(!fs.existsSync(path.dirname(versionedCacheDir)));
+  });
+
+  it("removes managed hook commands that point at versioned marketplace cache roots", () => {
+    const homeDir = makeTempHome();
+    const sourceRoot = makeTempSource();
+    const fakeCodex = createFakeCodex(homeDir);
+    copyFixture(sourceRoot);
+
+    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+
+    const codexDir = path.join(homeDir, ".codex");
+    const versionedCacheDir = path.join(
+      codexDir,
+      "plugins",
+      "cache",
+      "sendbird",
+      "cc",
+      "1.0.9"
+    );
+    const hooksFile = path.join(codexDir, "hooks.json");
+
+    fs.mkdirSync(path.join(versionedCacheDir, "hooks"), { recursive: true });
+    fs.appendFileSync(
+      path.join(codexDir, "config.toml"),
+      '\n[plugins."cc@sendbird"]\nenabled = true\n',
+      "utf8"
+    );
+    fs.writeFileSync(
+      hooksFile,
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [
+              {
+                matcher: "",
+                hooks: [
+                  {
+                    type: "command",
+                    command: `node '${path.join(versionedCacheDir, "hooks", "session-lifecycle-hook.mjs")}'`,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
+    );
+
+    runInstaller("uninstall", homeDir, sourceRoot, fakeCodex.env);
+
+    assert.ok(!fs.existsSync(hooksFile), "uninstall should remove managed hooks even when they point at a versioned cache root");
   });
 
   it("removes managed hooks before calling Codex plugin/uninstall", () => {

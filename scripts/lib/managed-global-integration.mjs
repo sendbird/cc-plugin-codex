@@ -7,21 +7,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { normalizePathSlashes, resolveCodexHome } from "./codex-paths.mjs";
-
-const MARKETPLACE_NAME = "local-plugins";
-const PLUGIN_NAME = "cc";
-const HOME_DIR = os.homedir();
-const CODEX_HOME = resolveCodexHome();
-const CODEX_CONFIG_FILE = path.join(CODEX_HOME, "config.toml");
-const CODEX_HOOKS_FILE = path.join(CODEX_HOME, "hooks.json");
-const CODEX_PLUGIN_CACHE_DIR = path.join(
-  CODEX_HOME,
-  "plugins",
-  "cache",
-  MARKETPLACE_NAME,
+import {
+  getManagedPluginSignals as getManagedPluginSignalsBase,
+  LEGACY_MARKETPLACE_NAME,
+  listManagedPluginCacheEntries,
   PLUGIN_NAME,
-  "local"
-);
+} from "./plugin-identity.mjs";
+
+const CODEX_HOME = resolveCodexHome();
+const HOME_DIR = os.homedir();
+const CODEX_HOOKS_FILE = path.join(CODEX_HOME, "hooks.json");
 const CODEX_SKILLS_DIR = path.join(CODEX_HOME, "skills");
 const CODEX_PROMPTS_DIR = path.join(CODEX_HOME, "prompts");
 const MANAGED_WRAPPER_SKILLS = [
@@ -33,11 +28,6 @@ const MANAGED_WRAPPER_SKILLS = [
   "cancel",
   "setup",
 ];
-const PLUGIN_SECTION_HEADER_PATTERN =
-  /^\[\s*plugins\s*\.\s*["']?cc@local-plugins["']?\s*\]\s*(?:#.*)?$/i;
-const PLUGIN_ENABLED_PATTERN = /^enabled\s*=\s*true\s*(?:#.*)?$/i;
-const TOML_SECTION_PATTERN = /^\[.*\]\s*(?:#.*)?$/;
-const TOML_ASSIGNMENT_PATTERN = /^[A-Za-z0-9_.-]+\s*=/;
 
 function readText(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -60,10 +50,6 @@ function removeIfEmpty(dirPath) {
   }
 }
 
-function readConfigFile() {
-  return readText(CODEX_CONFIG_FILE) ?? "";
-}
-
 export function removeManagedHooks(pluginRoot) {
   const raw = readText(CODEX_HOOKS_FILE);
   if (!raw) {
@@ -73,14 +59,19 @@ export function removeManagedHooks(pluginRoot) {
   const parsed = JSON.parse(raw);
   const nextHooks = {};
   let changed = false;
-  const hookPrefix = normalizePathSlashes(path.join(pluginRoot, "hooks")) + "/";
+  const hookPrefixes = [
+    normalizePathSlashes(path.join(pluginRoot, "hooks")) + "/",
+    ...listManagedPluginCacheEntries().map(
+      (cacheEntry) => normalizePathSlashes(path.join(cacheEntry.cachePath, "hooks")) + "/"
+    ),
+  ];
 
   for (const [eventName, entries] of Object.entries(parsed.hooks ?? {})) {
     const keptEntries = [];
     for (const entry of entries ?? []) {
       const keptNested = (entry.hooks ?? []).filter((hook) => {
         const command = normalizePathSlashes(String(hook?.command ?? ""));
-        const shouldRemove = command.includes(hookPrefix);
+        const shouldRemove = hookPrefixes.some((hookPrefix) => command.includes(hookPrefix));
         changed ||= shouldRemove;
         return !shouldRemove;
       });
@@ -125,82 +116,7 @@ export function removeManagedSkillWrappers() {
 }
 
 export function getManagedPluginSignals() {
-  const configContent = readText(CODEX_CONFIG_FILE);
-  const cachePresent = fs.existsSync(CODEX_PLUGIN_CACHE_DIR);
-
-  if (configContent == null) {
-    return {
-      configState: "unknown",
-      cachePresent,
-      reason: "config-missing",
-    };
-  }
-
-  if (configContent.trim() === "") {
-    return {
-      configState: "unknown",
-      cachePresent,
-      reason: "config-empty",
-    };
-  }
-
-  const hasTomlLikeStructure = configContent
-    .split("\n")
-    .map((line) => line.trim())
-    .some(
-      (line) =>
-        line !== "" &&
-        !line.startsWith("#") &&
-        (TOML_SECTION_PATTERN.test(line) || TOML_ASSIGNMENT_PATTERN.test(line))
-    );
-
-  if (!hasTomlLikeStructure) {
-    return {
-      configState: "unknown",
-      cachePresent,
-      reason: "config-unrecognized",
-    };
-  }
-
-  const pluginSection = configContent.split("\n").reduce(
-    (state, line) => {
-      const trimmed = line.trim();
-      if (!state.inSection) {
-        if (PLUGIN_SECTION_HEADER_PATTERN.test(trimmed)) {
-          state.inSection = true;
-          state.foundSection = true;
-        }
-        return state;
-      }
-      if (trimmed.startsWith("[")) {
-        state.inSection = false;
-        return state;
-      }
-      if (trimmed !== "") {
-        state.lines.push(trimmed);
-      }
-      return state;
-    },
-    { inSection: false, foundSection: false, lines: [] }
-  );
-
-  if (!pluginSection.foundSection) {
-    return {
-      configState: "inactive",
-      cachePresent,
-      reason: "plugin-section-missing",
-    };
-  }
-
-  const pluginEnabled =
-    Array.isArray(pluginSection.lines) &&
-    pluginSection.lines.some((line) => PLUGIN_ENABLED_PATTERN.test(line));
-
-  return {
-    configState: pluginEnabled ? "active" : "inactive",
-    cachePresent,
-    reason: pluginEnabled ? "plugin-enabled" : "plugin-disabled",
-  };
+  return getManagedPluginSignalsBase();
 }
 
 export function isCodexPluginActive() {
@@ -226,3 +142,5 @@ export function resolveManagedMarketplacePluginPath(pluginRoot) {
   }
   return `./${normalizePathSlashes(relative)}`;
 }
+
+export { LEGACY_MARKETPLACE_NAME, PLUGIN_NAME };

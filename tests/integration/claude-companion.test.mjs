@@ -1186,7 +1186,7 @@ describe("claude-companion integration", () => {
     }
   });
 
-  it("marks foreground task results as viewed and marks explicit result retrievals as viewed", async () => {
+  it("marks foreground task results as viewed and marks status/result retrievals as viewed", async () => {
     const testEnv = createTestEnvironment();
     const sessionEnv = {
       ...testEnv.env,
@@ -1220,7 +1220,17 @@ describe("claude-companion integration", () => {
         ],
         { env: sessionEnv }
       );
-      await waitForTerminalStatus(testEnv, backgroundLaunch.jobId, sessionEnv);
+      await (async () => {
+        const deadline = Date.now() + 20_000;
+        while (Date.now() < deadline) {
+          const storedJob = readStoredJobById(testEnv, backgroundLaunch.jobId);
+          if (storedJob.status === "completed" || storedJob.status === "failed") {
+            return;
+          }
+          await sleep(25);
+        }
+        assert.fail(`Timed out waiting for stored terminal job on ${backgroundLaunch.jobId}`);
+      })();
 
       const beforeResult = readStoredJobById(testEnv, backgroundLaunch.jobId);
       assert.equal(
@@ -1229,16 +1239,32 @@ describe("claude-companion integration", () => {
         "background completion should remain unread until result is fetched"
       );
 
-      runCompanion(
-        ["result", "--cwd", testEnv.workspaceDir, backgroundLaunch.jobId],
+      const statusPayload = runCompanionJson(
+        ["status", "--cwd", testEnv.workspaceDir, backgroundLaunch.jobId, "--json"],
         { env: sessionEnv }
       );
+      assert.equal(
+        statusPayload.job.id,
+        backgroundLaunch.jobId,
+        "status --json should return the finished background job"
+      );
+
+      const afterStatus = readStoredJobById(testEnv, backgroundLaunch.jobId);
+      assert.match(
+        afterStatus.resultViewedAt ?? "",
+        /\d{4}-\d{2}-\d{2}T/,
+        "fetching finished job details through status --json should mark the job as viewed"
+      );
+
+      runCompanion(["result", "--cwd", testEnv.workspaceDir, backgroundLaunch.jobId], {
+        env: sessionEnv,
+      });
 
       const afterResult = readStoredJobById(testEnv, backgroundLaunch.jobId);
       assert.match(
         afterResult.resultViewedAt ?? "",
         /\d{4}-\d{2}-\d{2}T/,
-        "fetching result should mark the job as viewed"
+        "fetching result should keep the job marked as viewed"
       );
     } finally {
       cleanupTestEnvironment(testEnv);

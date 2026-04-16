@@ -14,12 +14,13 @@
  * 3. Read existing ~/.codex/hooks.json (or empty {hooks:{}})
  * 4. For each event type, append new hooks (don't overwrite existing)
  * 5. Write merged result
- * 6. Check if ~/.codex/config.toml has codex_hooks = true, print guidance if not
+ * 6. Ensure ~/.codex/config.toml has codex_hooks = true
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureCodexHooksEnabled } from "./lib/codex-config.mjs";
 import { resolveCodexHome } from "./lib/codex-paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -55,6 +56,15 @@ function writeTextFile(filePath, content) {
 function writeJsonFile(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf8");
+}
+
+function configureCodexHooks() {
+  const existing = readTextFile(CODEX_CONFIG_TOML) ?? "";
+  const { changed, content } = ensureCodexHooksEnabled(existing);
+  if (changed || !fs.existsSync(CODEX_CONFIG_TOML)) {
+    writeTextFile(CODEX_CONFIG_TOML, content);
+  }
+  return changed;
 }
 
 function escapeShellArgument(value) {
@@ -241,23 +251,10 @@ function main() {
   console.log(`  Added: ${addedCount} hook entries`);
   console.log(`  Skipped: ${skippedCount} duplicate entries`);
 
-  // Step 6: Check config.toml for codex_hooks setting
-  let hasCodexHooks = false;
-  if (fs.existsSync(CODEX_CONFIG_TOML)) {
-    const configContent = fs.readFileSync(CODEX_CONFIG_TOML, "utf8");
-    // Simple check — TOML parsing not needed for a boolean flag
-    hasCodexHooks = /codex_hooks\s*=\s*true/i.test(configContent);
-  }
-
-  if (!hasCodexHooks) {
-    console.log("\n--- IMPORTANT ---");
-    console.log("Codex hooks are not enabled in your config.");
-    console.log("Add the following to ~/.codex/config.toml:");
-    console.log("");
-    console.log("  [features]");
-    console.log("  codex_hooks = true");
-    console.log("");
-    console.log("This enables Codex to execute lifecycle hooks from hooks.json.");
+  // Step 6: Ensure config.toml enables codex_hooks
+  const codexHooksChanged = configureCodexHooks();
+  if (codexHooksChanged) {
+    console.log("\nEnabled codex_hooks in ~/.codex/config.toml.");
   } else {
     console.log("\nCodex hooks are enabled in config.toml. Ready to go.");
   }

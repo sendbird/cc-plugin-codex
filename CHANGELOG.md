@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.9
+
+- Add marketplace-aware install foundation for Codex 0.121+: the installer can now prefer `marketplace/add` + `plugin/install` when an official marketplace source is available, while keeping the existing legacy fallback path for unsupported builds.
+- Generalize managed plugin identity handling so setup, hook cleanup, and cache detection work for `cc@<marketplace>` installs instead of assuming `cc@local-plugins`.
+- Document the new canonical marketplace location at `sendbird/codex-marketplace` and make Sendbird marketplace install the first documented path, with `$cc:setup` called out as the required post-install hook repair step.
+
 ## v1.0.8
 
 - Clarify the routing boundary between `$cc:review`, `$cc:adversarial-review`, and `$cc:rescue`, including the rule that ordinary code-review requests default to `review`, stronger scrutiny plus custom focus text belongs to `adversarial-review`, and rescue is only for Claude-owned follow-through work.

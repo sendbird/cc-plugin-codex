@@ -1,0 +1,110 @@
+name: Update Codex Marketplace
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to publish into the marketplace snapshot
+        required: false
+        default: main
+
+jobs:
+  update-marketplace:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      MARKETPLACE_REPO: sendbird/codex-marketplace
+      MARKETPLACE_BRANCH_PREFIX: auto/update-cc-
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.ref || github.ref_name }}
+
+      - name: Verify marketplace token is configured
+        env:
+          MARKETPLACE_TOKEN: ${{ secrets.SENDBIRD_CODEX_MARKETPLACE_PUSH_TOKEN }}
+        run: |
+          if [ -z "$MARKETPLACE_TOKEN" ]; then
+            echo "SENDBIRD_CODEX_MARKETPLACE_PUSH_TOKEN is required to update $MARKETPLACE_REPO" >&2
+            exit 1
+          fi
+
+      - name: Build marketplace snapshot
+        run: |
+          SNAPSHOT_DIR="$RUNNER_TEMP/marketplace-snapshot/cc"
+          mkdir -p "$SNAPSHOT_DIR"
+          for entry in \
+            .codex-plugin \
+            CHANGELOG.md \
+            LICENSE \
+            NOTICE \
+            README.md \
+            agents \
+            assets \
+            hooks \
+            internal-skills \
+            package.json \
+            prompts \
+            schemas \
+            scripts \
+            skills
+          do
+            if [ -e "$entry" ]; then
+              rsync -a "$entry" "$SNAPSHOT_DIR/"
+            fi
+          done
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          repository: sendbird/codex-marketplace
+          path: marketplace
+          token: ${{ secrets.SENDBIRD_CODEX_MARKETPLACE_PUSH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Update marketplace snapshot
+        run: |
+          rm -rf marketplace/plugins/cc
+          mkdir -p marketplace/plugins
+          rsync -a --delete "$RUNNER_TEMP/marketplace-snapshot/cc/" marketplace/plugins/cc/
+
+      - name: Create marketplace pull request
+        env:
+          GH_TOKEN: ${{ secrets.SENDBIRD_CODEX_MARKETPLACE_PUSH_TOKEN }}
+          REF_NAME: ${{ github.event.release.tag_name || inputs.ref || github.ref_name }}
+        run: |
+          cd marketplace
+
+          if git diff --quiet -- plugins/cc; then
+            echo "Marketplace snapshot already matches $REF_NAME"
+            exit 0
+          fi
+
+          BRANCH_NAME="${MARKETPLACE_BRANCH_PREFIX}${REF_NAME//\//-}"
+          git checkout -B "$BRANCH_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/cc
+          git commit -m "Update cc plugin snapshot to $REF_NAME"
+          git push --force-with-lease origin "$BRANCH_NAME"
+
+          EXISTING_PR_NUMBER=$(gh pr list \
+            --repo "$MARKETPLACE_REPO" \
+            --head "$BRANCH_NAME" \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING_PR_NUMBER" ]; then
+            echo "Marketplace PR already exists: #$EXISTING_PR_NUMBER"
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "$MARKETPLACE_REPO" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "Update cc plugin snapshot to $REF_NAME" \
+            --body "Update \`plugins/cc\` in the Sendbird Codex marketplace to \`$REF_NAME\` from \`sendbird/cc-plugin-codex\`."

@@ -981,6 +981,33 @@ function renderStatusPayload(report, asJson) {
   return asJson ? report : renderStatusReport(report);
 }
 
+function statusPayloadSurfacesStoredResult(job) {
+  return (
+    Boolean(job) &&
+    (job.status === "completed" ||
+      job.status === "failed" ||
+      job.status === "cancelled" ||
+      job.status === "cancel_failed" ||
+      job.status === "unknown") &&
+    Object.prototype.hasOwnProperty.call(job, "result")
+  );
+}
+
+function markViewedViaStatusAccess(workspaceRoot, jobs) {
+  const viewedAt = nowIso();
+  let changed = false;
+
+  for (const job of jobs) {
+    if (!job?.id || job.resultViewedAt || !statusPayloadSurfacesStoredResult(job)) {
+      continue;
+    }
+    patchJob(workspaceRoot, job.id, { resultViewedAt: viewedAt });
+    changed = true;
+  }
+
+  return changed;
+}
+
 // ---------------------------------------------------------------------------
 // Foreground execution wrapper
 // ---------------------------------------------------------------------------
@@ -1476,12 +1503,24 @@ async function handleStatus(argv) {
   const cwd = resolveCommandCwd(options);
   const reference = positionals[0] ?? "";
   if (reference) {
-    const snapshot = options.wait
+    let snapshot = options.wait
       ? await waitForSingleJobSnapshot(cwd, reference, {
           timeoutMs: options["timeout-ms"],
           pollIntervalMs: options["poll-interval-ms"]
         })
       : buildSingleJobSnapshot(cwd, reference);
+    if (
+      options.json &&
+      markViewedViaStatusAccess(snapshot.workspaceRoot, [snapshot.job])
+    ) {
+      snapshot = options.wait
+        ? {
+            ...buildSingleJobSnapshot(cwd, reference),
+            waitTimedOut: snapshot.waitTimedOut,
+            timeoutMs: snapshot.timeoutMs,
+          }
+        : buildSingleJobSnapshot(cwd, reference);
+    }
     outputCommandResult(
       snapshot,
       renderJobStatusReport(snapshot.job),
@@ -1494,7 +1533,16 @@ async function handleStatus(argv) {
     throw new Error("`status --wait` requires a job id.");
   }
 
-  const report = buildStatusSnapshot(cwd, { all: options.all });
+  let report = buildStatusSnapshot(cwd, { all: options.all });
+  if (
+    options.json &&
+    markViewedViaStatusAccess(report.workspaceRoot, [
+      report.latestFinished,
+      ...report.recent,
+    ])
+  ) {
+    report = buildStatusSnapshot(cwd, { all: options.all });
+  }
   outputResult(renderStatusPayload(report, options.json), options.json);
 }
 

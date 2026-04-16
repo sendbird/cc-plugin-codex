@@ -84,10 +84,13 @@ describe("install-hooks.mjs", () => {
     const result = runInstallHooks(homeDir);
 
     const hooksFile = path.join(homeDir, ".codex", "hooks.json");
+    const configFile = path.join(homeDir, ".codex", "config.toml");
 
     assert.ok(fs.existsSync(hooksFile));
+    assert.ok(fs.existsSync(configFile));
 
     const hooks = JSON.parse(fs.readFileSync(hooksFile, "utf8"));
+    const config = fs.readFileSync(configFile, "utf8");
     const sessionStartCommand =
       hooks.hooks.SessionStart[0].hooks[0].command;
     assert.ok(sessionStartCommand.includes(`${PROJECT_ROOT}/hooks/session-lifecycle-hook.mjs`));
@@ -101,7 +104,30 @@ describe("install-hooks.mjs", () => {
     const userPromptCommand =
       hooks.hooks.UserPromptSubmit[0].hooks[0].command;
     assert.ok(userPromptCommand.includes(`${PROJECT_ROOT}/hooks/unread-result-hook.mjs`));
+    assert.match(config, /\[features\]/);
+    assert.match(config, /codex_hooks = true/);
     assert.ok(result.stdout.includes("Codex hooks installation complete."));
+  });
+
+  it("upgrades an existing false codex_hooks setting to true", () => {
+    const homeDir = makeTempHome();
+    tempHomes.push(homeDir);
+
+    const codexDir = path.join(homeDir, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexDir, "config.toml"),
+      "[features]\ncodex_hooks = false\n",
+      "utf8"
+    );
+
+    const result = runInstallHooks(homeDir);
+    const config = fs.readFileSync(path.join(codexDir, "config.toml"), "utf8");
+
+    assert.match(config, /\[features\]/);
+    assert.match(config, /codex_hooks = true/);
+    assert.doesNotMatch(config, /codex_hooks = false/);
+    assert.match(result.stdout, /Enabled codex_hooks/i);
   });
 
   it("does not duplicate semantically identical hook commands when quoting changes", () => {

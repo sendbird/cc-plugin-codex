@@ -43,20 +43,37 @@ It follows the shape of [openai/codex-plugin-cc](https://github.com/openai/codex
 
 ### 1. Install
 
-```bash
-npx cc-plugin-codex install
-```
+Use one of these install paths, in this order:
 
-That's the entire install. It:
+1. **Sendbird marketplace (preferred)**
+   ```bash
+   codex marketplace add sendbird/codex-marketplace
+   ```
+   Then install `cc` from the Sendbird marketplace inside Codex, and run `$cc:setup` once. Marketplace/plugin install places the plugin, but this plugin still owns global hook setup and repair.
+
+2. **`npx` installer**
+   ```bash
+   npx cc-plugin-codex install
+   ```
+   This is the cross-platform path we test on every release.
+
+3. **Local checkout install**
+   ```bash
+   git clone https://github.com/sendbird/cc-plugin-codex.git ~/.codex/plugins/cc
+   cd ~/.codex/plugins/cc
+   node scripts/local-plugin-install.mjs install --plugin-root ~/.codex/plugins/cc
+   ```
+   After install, run `$cc:setup`.
+
+The `npx` installer:
 - Copies the plugin to `~/.codex/plugins/cc`
 - Activates the plugin through Codex app-server when available
 - Falls back to config-based activation on older Codex builds
 - Enables `codex_hooks = true`
 - Installs lifecycle, review-gate, and unread-result hooks
 
-On Windows, prefer the `npx` path above. The shell-script installer below is POSIX-only.
-Codex CLI's official guidance still treats Windows support as experimental and recommends a WSL workspace for the best Codex experience. Claude Code supports both native Windows and WSL. In hosted CI we currently keep Windows on the native cross-platform core suite, while full integration and E2E coverage run on Linux and macOS.
-The `npx` install path is the cross-platform path we test on every release.
+On Windows, prefer either the Sendbird marketplace path or the `npx` path. The shell-script installer below is POSIX-only.
+Codex CLI's official guidance still treats Windows support as experimental and recommends a WSL workspace for the best Codex experience. Claude Code supports both native Windows and WSL.
 
 > **Prerequisites:** Node.js 18+, Codex with hook support, and `claude` CLI installed and authenticated.
 > If you don't have the Claude CLI yet:
@@ -213,6 +230,7 @@ $cc:setup --disable-review-gate     # turn it off
 ```
 
 Setup checks Claude Code availability, hook installation, and review-gate state. If hooks are missing, it reinstalls them. If Claude Code isn't installed, it offers to install it.
+This is also the repair path for marketplace-installed copies of the plugin: marketplace install can place the plugin, but `$cc:setup` is what confirms `codex_hooks = true` and installs the managed global hooks if they are missing.
 
 ## Background Jobs
 
@@ -279,16 +297,32 @@ The review gate is an **optional** stop-time hook. When enabled, pressing Ctrl+C
 
 ## Install Variants
 
-### npx (recommended)
+### Sendbird marketplace (preferred)
+
+Add the marketplace:
+
+```bash
+codex marketplace add sendbird/codex-marketplace
+```
+
+Then install `cc` from the Sendbird marketplace inside Codex, and run:
+
+```text
+$cc:setup
+```
+
+Marketplace/plugin install places the plugin, but it does **not** install this plugin's managed global hooks for you. `$cc:setup` is the repair/install step that confirms `codex_hooks = true` and installs hooks when they are missing.
+
+### npx
 
 ```bash
 npx cc-plugin-codex install
 ```
 
-### Shell script
+After install, run:
 
-```bash
-curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
+```text
+$cc:setup
 ```
 
 ### Local checkout
@@ -299,7 +333,25 @@ cd ~/.codex/plugins/cc
 node scripts/local-plugin-install.mjs install --plugin-root ~/.codex/plugins/cc
 ```
 
+After install, run:
+
+```text
+$cc:setup
+```
+
 `local-plugin-install.mjs` expects `--plugin-root` to be the managed install directory itself. If you want to install from an arbitrary checkout path, use `npx cc-plugin-codex install` instead.
+
+### Shell script (POSIX-only)
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/sendbird/cc-plugin-codex/main/scripts/install.sh" | bash
+```
+
+After install, run:
+
+```text
+$cc:setup
+```
 
 ### Update
 

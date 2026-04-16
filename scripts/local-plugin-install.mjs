@@ -12,8 +12,17 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { callCodexAppServer } from "./lib/codex-app-server.mjs";
+import { ensureCodexHooksEnabled } from "./lib/codex-config.mjs";
 import { normalizePathSlashes, resolveCodexHome, samePath } from "./lib/codex-paths.mjs";
 import { materializeInstalledSkillPaths } from "./lib/installed-skill-paths.mjs";
+import {
+  parseManagedPluginSections,
+  getPreferredMarketplaceName,
+  LEGACY_MARKETPLACE_NAME,
+  pluginConfigHeader,
+  pluginIdForMarketplace,
+  PLUGIN_NAME,
+} from "./lib/plugin-identity.mjs";
 import {
   cleanupManagedGlobalIntegrations,
   resolveManagedMarketplacePluginPath,
@@ -22,9 +31,7 @@ import {
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PLUGIN_ROOT = path.resolve(SCRIPT_DIR, "..");
-const MARKETPLACE_NAME = "local-plugins";
 const MARKETPLACE_DISPLAY_NAME = "Local Plugins";
-const PLUGIN_NAME = "cc";
 const HOME_DIR = os.homedir();
 const CODEX_HOME = resolveCodexHome();
 const MARKETPLACE_FILE = path.join(HOME_DIR, ".agents", "plugins", "marketplace.json");
@@ -32,7 +39,6 @@ const CODEX_CONFIG_FILE = path.join(CODEX_HOME, "config.toml");
 const CODEX_SKILLS_DIR = path.join(CODEX_HOME, "skills");
 const CODEX_PROMPTS_DIR = path.join(CODEX_HOME, "prompts");
 const INSTALLED_PLUGIN_ROOT = path.join(CODEX_HOME, "plugins", PLUGIN_NAME);
-const PLUGIN_CONFIG_HEADER = `[plugins."${PLUGIN_NAME}@${MARKETPLACE_NAME}"]`;
 const EXPORTED_SKILLS = [
   "review",
   "adversarial-review",
@@ -42,6 +48,24 @@ const EXPORTED_SKILLS = [
   "cancel",
   "setup",
 ];
+function resolveInstallerMarketplaceConfig() {
+  const configuredName =
+    process.env.CC_PLUGIN_CODEX_MARKETPLACE_NAME?.trim() ||
+    getPreferredMarketplaceName(LEGACY_MARKETPLACE_NAME);
+  const source = process.env.CC_PLUGIN_CODEX_MARKETPLACE_SOURCE?.trim() || null;
+  const refName = process.env.CC_PLUGIN_CODEX_MARKETPLACE_REF?.trim() || null;
+  const sparsePaths = (process.env.CC_PLUGIN_CODEX_MARKETPLACE_SPARSE_PATHS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return {
+    marketplaceName: configuredName,
+    source,
+    refName,
+    sparsePaths: sparsePaths.length > 0 ? sparsePaths : null,
+  };
+}
 
 function usage() {
   console.error(
@@ -207,11 +231,11 @@ function installCodexSkillWrappers(pluginRoot) {
   }
 }
 
-function loadMarketplaceFile() {
+function loadMarketplaceFile(marketplaceName) {
   const existing = readText(MARKETPLACE_FILE);
   if (!existing) {
     return {
-      name: MARKETPLACE_NAME,
+      name: marketplaceName,
       interface: {
         displayName: MARKETPLACE_DISPLAY_NAME,
       },
@@ -228,7 +252,7 @@ function loadMarketplaceFile() {
     parsed.plugins = [];
   }
   if (!parsed.name) {
-    parsed.name = MARKETPLACE_NAME;
+    parsed.name = marketplaceName;
   }
   if (!parsed.interface || typeof parsed.interface !== "object") {
     parsed.interface = {};
@@ -249,9 +273,9 @@ function saveMarketplaceFile(data) {
   writeText(MARKETPLACE_FILE, `${JSON.stringify(data, null, 2)}\n`);
 }
 
-function upsertMarketplaceEntry(pluginRoot) {
+function upsertMarketplaceEntry(pluginRoot, marketplaceName) {
   const pluginPath = resolveManagedMarketplacePluginPath(pluginRoot);
-  const marketplace = loadMarketplaceFile();
+  const marketplace = loadMarketplaceFile(marketplaceName);
   const nextEntry = {
     name: PLUGIN_NAME,
     source: {
@@ -277,19 +301,15 @@ function upsertMarketplaceEntry(pluginRoot) {
   saveMarketplaceFile(marketplace);
 }
 
-function removeMarketplaceEntry(pluginRoot) {
+function removeMarketplaceEntry(pluginRoot, marketplaceName) {
   const existing = readText(MARKETPLACE_FILE);
   if (!existing) {
     return;
   }
 
-  const pluginPath = resolveManagedMarketplacePluginPath(pluginRoot);
-  const marketplace = loadMarketplaceFile();
+  const marketplace = loadMarketplaceFile(marketplaceName);
   marketplace.plugins = marketplace.plugins.filter((plugin) => {
-    if (plugin?.name !== PLUGIN_NAME) {
-      return true;
-    }
-    return plugin?.source?.path !== pluginPath;
+    return plugin?.name !== PLUGIN_NAME;
   });
   saveMarketplaceFile(marketplace);
 }
@@ -323,7 +343,8 @@ function removeTomlSections(content, headers) {
   };
 }
 
-function ensurePluginEnabled(content) {
+function ensurePluginEnabled(content, marketplaceName) {
+  const pluginHeader = pluginConfigHeader(marketplaceName);
   const lines = content.split("\n");
   const next = [];
   let inPluginSection = false;
@@ -339,7 +360,7 @@ function ensurePluginEnabled(content) {
         foundEnabled = true;
         changed = true;
       }
-      inPluginSection = trimmed === PLUGIN_CONFIG_HEADER;
+      inPluginSection = trimmed === pluginHeader;
       foundPluginSection ||= inPluginSection;
       next.push(line);
       continue;
@@ -368,63 +389,7 @@ function ensurePluginEnabled(content) {
     if (next.length > 0 && next[next.length - 1].trim() !== "") {
       next.push("");
     }
-    next.push(PLUGIN_CONFIG_HEADER, "enabled = true");
-    changed = true;
-  }
-
-  return {
-    changed,
-    content: normalizeTrailingNewline(next.join("\n").replace(/\n{3,}/g, "\n\n")),
-  };
-}
-
-function ensureCodexHooksEnabled(content) {
-  const lines = content.split("\n");
-  const next = [];
-  let inFeatures = false;
-  let foundFeatures = false;
-  let foundCodexHooks = false;
-  let changed = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      if (inFeatures && !foundCodexHooks) {
-        next.push("codex_hooks = true");
-        foundCodexHooks = true;
-        changed = true;
-      }
-      inFeatures = trimmed === "[features]";
-      foundFeatures ||= inFeatures;
-      next.push(line);
-      continue;
-    }
-
-    if (inFeatures && /^codex_hooks\s*=/.test(trimmed)) {
-      foundCodexHooks = true;
-      if (trimmed !== "codex_hooks = true") {
-        next.push("codex_hooks = true");
-        changed = true;
-      } else {
-        next.push(line);
-      }
-      continue;
-    }
-
-    next.push(line);
-  }
-
-  if (inFeatures && !foundCodexHooks) {
-    next.push("codex_hooks = true");
-    foundCodexHooks = true;
-    changed = true;
-  }
-
-  if (!foundFeatures) {
-    if (next.length > 0 && next[next.length - 1].trim() !== "") {
-      next.push("");
-    }
-    next.push("[features]", "codex_hooks = true");
+    next.push(pluginHeader, "enabled = true");
     changed = true;
   }
 
@@ -442,9 +407,14 @@ function writeConfigFile(content) {
   writeText(CODEX_CONFIG_FILE, normalizeTrailingNewline(content));
 }
 
-function removePluginConfigBlock() {
+function removePluginConfigBlock(marketplaceName) {
   const existing = readConfigFile();
-  const pluginRemoval = removeTomlSections(existing, new Set([PLUGIN_CONFIG_HEADER]));
+  const managedHeaders = parseManagedPluginSections(existing).map((section) =>
+    pluginConfigHeader(section.marketplaceName)
+  );
+  const headers =
+    managedHeaders.length > 0 ? new Set(managedHeaders) : new Set([pluginConfigHeader(marketplaceName)]);
+  const pluginRemoval = removeTomlSections(existing, headers);
   if (pluginRemoval.changed) {
     writeConfigFile(pluginRemoval.content);
   }
@@ -456,9 +426,9 @@ function configureCodexHooks() {
   writeConfigFile(content);
 }
 
-function enablePluginThroughConfigFallback() {
+function enablePluginThroughConfigFallback(marketplaceName) {
   const existing = readConfigFile();
-  const { content } = ensurePluginEnabled(existing);
+  const { content } = ensurePluginEnabled(existing, marketplaceName);
   writeConfigFile(content);
 }
 
@@ -474,15 +444,31 @@ function runInstallHooks(pluginRoot) {
   }
 }
 
-async function installPluginThroughCodex() {
+async function installPluginThroughCodex(marketplacePath) {
   await callCodexAppServer({
-    cwd: path.dirname(MARKETPLACE_FILE),
+    cwd: path.dirname(marketplacePath),
     method: "plugin/install",
     params: {
-      marketplacePath: MARKETPLACE_FILE,
+      marketplacePath,
       pluginName: PLUGIN_NAME,
       forceRemoteSync: false,
     },
+  });
+}
+
+async function addMarketplaceThroughCodex({ source, refName, sparsePaths }) {
+  const params = { source };
+  if (refName) {
+    params.refName = refName;
+  }
+  if (sparsePaths && sparsePaths.length > 0) {
+    params.sparsePaths = sparsePaths;
+  }
+
+  return await callCodexAppServer({
+    cwd: INSTALLED_PLUGIN_ROOT,
+    method: "marketplace/add",
+    params,
   });
 }
 
@@ -496,18 +482,29 @@ function isCodexInstallFallbackEligible(error) {
   );
 }
 
-async function uninstallPluginThroughCodex() {
+function isCodexMarketplaceAddFallbackEligible(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /Method not found/i.test(message) ||
+    /Failed to start .*codex/i.test(message) ||
+    /app-server exited before responding to marketplace\/add/i.test(message) ||
+    /app-server timed out waiting for marketplace\/add/i.test(message)
+  );
+}
+
+async function uninstallPluginThroughCodex(marketplaceName) {
   await callCodexAppServer({
     cwd: CODEX_HOME,
     method: "plugin/uninstall",
     params: {
-      pluginId: `${PLUGIN_NAME}@${MARKETPLACE_NAME}`,
+      pluginId: pluginIdForMarketplace(marketplaceName),
       forceRemoteSync: false,
     },
   });
 }
 
 export async function install(pluginRoot, skipHookInstall) {
+  const marketplaceConfig = resolveInstallerMarketplaceConfig();
   assertSupportedPluginRoot(pluginRoot);
   if (
     samePath(pluginRoot, INSTALLED_PLUGIN_ROOT) &&
@@ -515,17 +512,39 @@ export async function install(pluginRoot, skipHookInstall) {
   ) {
     materializeInstalledSkillPaths(pluginRoot);
   }
-  upsertMarketplaceEntry(pluginRoot);
+  let marketplacePath = MARKETPLACE_FILE;
+  let usedLegacyMarketplaceFallback = false;
+
+  if (marketplaceConfig.source) {
+    try {
+      const result = await addMarketplaceThroughCodex(marketplaceConfig);
+      marketplacePath = path.join(result.installedRoot, ".agents", "plugins", "marketplace.json");
+    } catch (error) {
+      if (!isCodexMarketplaceAddFallbackEligible(error)) {
+        throw error;
+      }
+      upsertMarketplaceEntry(pluginRoot, marketplaceConfig.marketplaceName);
+      usedLegacyMarketplaceFallback = true;
+      const detail = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Warning: Codex marketplace/add unavailable; falling back to a personal marketplace entry. ${detail}`
+      );
+    }
+  } else {
+    upsertMarketplaceEntry(pluginRoot, marketplaceConfig.marketplaceName);
+    usedLegacyMarketplaceFallback = true;
+  }
+
   configureCodexHooks();
   let usedFallback = false;
   try {
-    await installPluginThroughCodex();
+    await installPluginThroughCodex(marketplacePath);
     removeManagedSkillWrappers();
   } catch (error) {
     if (!isCodexInstallFallbackEligible(error)) {
       throw error;
     }
-    enablePluginThroughConfigFallback();
+    enablePluginThroughConfigFallback(marketplaceConfig.marketplaceName);
     installCodexSkillWrappers(pluginRoot);
     usedFallback = true;
     const detail = error instanceof Error ? error.message : String(error);
@@ -539,21 +558,25 @@ export async function install(pluginRoot, skipHookInstall) {
   if (usedFallback) {
     console.log("Installed using fallback local-plugin activation.");
   }
+  if (usedLegacyMarketplaceFallback && marketplaceConfig.source) {
+    console.log("Installed using legacy personal marketplace registration.");
+  }
   console.log(`Installed ${PLUGIN_NAME} from ${pluginRoot}`);
 }
 
 export async function uninstall(pluginRoot) {
+  const marketplaceConfig = resolveInstallerMarketplaceConfig();
   cleanupManagedGlobalIntegrations(pluginRoot);
-  removeMarketplaceEntry(pluginRoot);
+  removeMarketplaceEntry(pluginRoot, marketplaceConfig.marketplaceName);
   try {
-    await uninstallPluginThroughCodex();
+    await uninstallPluginThroughCodex(marketplaceConfig.marketplaceName);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.warn(
       `Warning: Codex plugin uninstall failed; continuing managed cleanup. ${detail}`
     );
   }
-  removePluginConfigBlock();
+  removePluginConfigBlock(marketplaceConfig.marketplaceName);
   console.log(`Uninstalled ${PLUGIN_NAME} from ${pluginRoot}`);
 }
 
