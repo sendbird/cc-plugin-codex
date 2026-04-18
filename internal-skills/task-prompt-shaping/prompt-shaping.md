@@ -1,14 +1,7 @@
----
-name: task-prompt-shaping
-description: Internal prompt-rewriting contract for tightening a rescue request before one forwarded Claude Code task call.
-user-invocable: false
----
+# Claude Code Rescue Prompt Shaping Reference
 
-# Task Prompt Shaping
-
-Use this skill only when the rescue forwarding worker needs to turn the user's request into a tighter Claude Code task prompt before one companion `task` call.
-This skill owns prompt text only. It does not decide execution mode, resume/fresh routing, or any other runtime controls.
-Keep the prompt compact and block-structured. The reference file is optional depth, not required for normal use.
+Use this document only when the rescue forwarding worker needs to turn the user's request into a tighter Claude Code task prompt before one companion `task` call.
+This is an internal prompt-shaping reference, not a public skill. It owns prompt text only. It does not decide execution mode, resume/fresh routing, or any other runtime controls.
 
 Core rules:
 - Prefer one clear task per Claude Code run. Split unrelated asks into separate runs.
@@ -32,12 +25,12 @@ Hard limits:
 - Do not solve the task yourself.
 - Do not add long boilerplate that does not change behavior.
 
-When to use this skill:
+When to use this reference:
 - The raw request is vague, chatty, or underspecified.
 - The request needs a clearer output contract or follow-through default.
 - A follow-up should become a short delta prompt for resume.
 
-When not to use this skill:
+When not to use this reference:
 - The raw request is already clear and compact.
 - The request is so short that rewriting would add more words than value.
 - You would need to inspect the repository first to improve the prompt. Do not do that here.

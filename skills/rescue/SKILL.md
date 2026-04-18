@@ -82,9 +82,10 @@ Subagent launch:
 - If it returns an empty `parentThreadId`, continue without parent wake-up instead of blocking the rescue.
 - This parent wake-up attempt is now the default for background built-in rescue on persistent Codex/Desktop threads. It is still best-effort and should silently degrade on one-shot `codex exec` runs.
 - For the built-in rescue path, the parent thread owns prompt shaping. The built-in child should stay a pure executor.
+- For the built-in rescue path, treat the internal runtime reference at `../../internal-skills/cli-runtime/runtime.md` as the command-building contract for the forwarding worker. It is an internal reference document, not a public skill to invoke.
 - If the built-in rescue request is vague, chatty, or a follow-up, the parent may tighten only the task text before composing the exact companion command.
 - Prefer passing a small structured `<parent_context>` block instead of forked thread history when the child needs a little prior context.
-- Use the `task-prompt-shaping` internal rules as guidance for that parent-side tightening:
+- Use the internal prompt-shaping reference at `../../internal-skills/task-prompt-shaping/prompt-shaping.md` as deeper guidance for that parent-side tightening. It is an internal reference document, not a public skill to invoke.
   - preserve user intent and add no new repo facts
   - prefer a short delta instruction for resume follow-ups
   - when helpful, use compact blocks such as `<task>`, `<output_contract>`, and `<default_follow_through_policy>`
