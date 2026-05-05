@@ -12,10 +12,15 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { normalizePathSlashes, resolvePluginRuntimeRoot } from "./codex-paths.mjs";
 import { getProcessIdentity, validateProcessIdentity } from "./process.mjs";
 
 const CLAUDE_BIN = "claude";
+const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const REVIEW_ONLY_BOUNDARY_HOOK = normalizePathSlashes(
+  path.join(PLUGIN_ROOT, "hooks", "review-only-boundary-hook.mjs")
+);
 export const MAX_STREAM_PARSER_UNKNOWN_EVENTS = 50;
 export const MAX_STREAM_PARSER_PARSE_ERRORS = 50;
 export const MAX_STREAM_PARSER_TOOL_USES = 256;
@@ -387,6 +392,30 @@ export const SANDBOX_SETTINGS = {
       network: {
         allowedDomains: [],
       },
+    },
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: "Write|Edit|MultiEdit|NotebookEdit|Task",
+          hooks: [
+            {
+              type: "command",
+              command: `node "${REVIEW_ONLY_BOUNDARY_HOOK}"`,
+              timeout: 5,
+            },
+          ],
+        },
+        {
+          matcher: "Bash|PowerShell",
+          hooks: [
+            {
+              type: "command",
+              command: `node "${REVIEW_ONLY_BOUNDARY_HOOK}"`,
+              timeout: 5,
+            },
+          ],
+        },
+      ],
     },
   },
   "workspace-write": {

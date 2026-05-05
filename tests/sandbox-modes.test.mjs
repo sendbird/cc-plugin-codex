@@ -228,6 +228,26 @@ describe("sandbox settings content", () => {
       SANDBOX_SETTINGS["workspace-write"].sandbox.network
     );
   });
+
+  it("read-only: installs scoped review-only PreToolUse hooks", () => {
+    const hooks = SANDBOX_SETTINGS["read-only"].hooks?.PreToolUse ?? [];
+    assert.equal(hooks.length, 2);
+    assert.deepEqual(
+      hooks.map((entry) => entry.matcher),
+      ["Write|Edit|MultiEdit|NotebookEdit|Task", "Bash|PowerShell"]
+    );
+
+    for (const entry of hooks) {
+      assert.equal(entry.hooks.length, 1);
+      assert.equal(entry.hooks[0].type, "command");
+      assert.match(entry.hooks[0].command, /node ".*review-only-boundary-hook\.mjs"$/);
+      assert.equal(entry.hooks[0].timeout, 5);
+    }
+  });
+
+  it("workspace-write: does not install review-only hooks", () => {
+    assert.equal(SANDBOX_SETTINGS["workspace-write"].hooks, undefined);
+  });
 });
 
 // ---------------------------------------------------------------------------
