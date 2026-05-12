@@ -16,15 +16,14 @@ function read(relativePath) {
   return fs.readFileSync(path.join(PROJECT_ROOT, relativePath), "utf8");
 }
 
-test("internal runtime references keep the installed-root and notification invariants", () => {
+test("internal runtime references keep the active-root and notification invariants", () => {
   const reviewRuntime = read("internal-skills/review-runtime/runtime.md");
   const rescueRuntime = read("internal-skills/cli-runtime/runtime.md");
-  const installedRootPattern =
-    /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
+  const activeRootPattern = /<plugin-root>\/scripts\/claude-companion\.mjs/i;
 
-  assert.match(reviewRuntime, /resolved the installed plugin root/i);
-  assert.match(reviewRuntime, installedRootPattern);
-  assert.match(reviewRuntime, /Do not derive a new runtime path from this document, any cache directory, or the current working tree/i);
+  assert.match(reviewRuntime, /resolved the active plugin root/i);
+  assert.match(reviewRuntime, activeRootPattern);
+  assert.match(reviewRuntime, /Do not derive a new runtime path from this document or the current working tree/i);
   assert.match(reviewRuntime, /Never emit an empty routing placeholder such as `--owner-session-id {2}--job-id`/i);
   assert.match(reviewRuntime, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(reviewRuntime, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
@@ -34,9 +33,9 @@ test("internal runtime references keep the installed-root and notification invar
   assert.match(reviewRuntime, /do not silently drop the completion notification path when the parent provided a non-empty parent thread id/i);
   assert.match(reviewRuntime, /Use that same steering message as the child's own final assistant message for background mode/i);
 
-  assert.match(rescueRuntime, /resolved the installed plugin root/i);
-  assert.match(rescueRuntime, installedRootPattern);
-  assert.match(rescueRuntime, /Do not derive a new runtime path from this document, any cache directory, or the current working tree/i);
+  assert.match(rescueRuntime, /resolved the active plugin root/i);
+  assert.match(rescueRuntime, activeRootPattern);
+  assert.match(rescueRuntime, /Do not derive a new runtime path from this document or the current working tree/i);
   assert.match(rescueRuntime, /Never emit an empty routing placeholder such as `--owner-session-id {2}--job-id`/i);
   assert.match(rescueRuntime, /Do not add `--quiet-progress` by default/i);
   assert.match(rescueRuntime, /slash command as literal Claude Code task text/i);
@@ -53,15 +52,15 @@ test("internal runtime references keep the installed-root and notification invar
 test("review skills keep background execution outside the companion command", () => {
   const review = read("skills/review/SKILL.md");
   const adversarial = read("skills/adversarial-review/SKILL.md");
-  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
+  const activeRootPattern = /<plugin-root>\/scripts\/claude-companion\.mjs/i;
 
-  assert.match(review, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(review, /Resolve `<plugin-root>` as two directories above this `SKILL\.md` file/i);
   assert.match(review, /Use `\$cc:review` as the default when the user asks for code review, asks you to have Claude review something, or wants a second review pass without explicitly asking for stronger adversarial scrutiny/i);
   assert.match(review, /If the user asks for stronger challenge on design, tradeoffs, rollout risk, migration risk, configuration behavior, or provides custom review focus text, route to `\$cc:adversarial-review` instead/i);
   assert.match(review, /If the user wants Claude Code to investigate, validate by changing code, or actually fix\/implement something, route to `\$cc:rescue` instead/i);
   assert.match(review, /If the overall request is "you review it too, also ask Claude to review in the background, then you aggregate and fix it", keep the delegated Claude part on `\$cc:review` unless the user explicitly asks for a harsher or more adversarial review/i);
   assert.match(review, /`\$cc:review` does not accept custom focus text/i);
-  assert.match(review, installedRootPattern);
+  assert.match(review, activeRootPattern);
   assert.match(review, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(review, /Strip them before calling the companion command/i);
   assert.match(review, /The companion review process itself always runs in the foreground/i);
@@ -72,7 +71,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /Do not spawn a review subagent/i);
   assert.match(review, /do not invoke a generic review-runner role/i);
   assert.match(review, /Do not fall back to raw `claude`, `claude-code`, `claude review`, `bash -lc \.\.\.claude\.\.\.`/i);
-  assert.match(review, /If the installed companion command fails, surface that failure/i);
+  assert.match(review, /If the .*companion command fails, surface that failure/i);
   assert.match(review, /For background review, use Codex's built-in `default` subagent/i);
   assert.match(review, /Do not satisfy background review by using a generic `claude_review_runner`-style helper role/i);
   assert.match(review, /Never satisfy background review by running the companion command itself with shell backgrounding/i);
@@ -109,13 +108,13 @@ test("review skills keep background execution outside the companion command", ()
   assert.doesNotMatch(review, /claude-companion\.mjs" review --background/i);
   assert.doesNotMatch(review, /claude-companion\.mjs" review \$ARGUMENTS/i);
 
-  assert.match(adversarial, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(adversarial, /Resolve `<plugin-root>` as two directories above this `SKILL\.md` file/i);
   assert.match(adversarial, /Do not treat `\$cc:adversarial-review` as the default review path/i);
   assert.match(adversarial, /Good triggers include requests to challenge the design, challenge tradeoffs, pressure-test a risky change, question whether a migration\/config\/template change really removed the risk, or honor custom focus text that asks for harsher review/i);
   assert.match(adversarial, /If the user wants Claude Code to go beyond review and perform investigation, validation edits, or implementation work, route to `\$cc:rescue` instead/i);
   assert.match(adversarial, /If the user asks for a local review plus a separate Claude background review and then wants the main Codex thread to aggregate the findings and apply fixes, keep the delegated Claude portion on `\$cc:review` unless the user explicitly asks for the adversarial angle/i);
   assert.match(adversarial, /Unlike `\$cc:review`, this skill accepts custom focus text after the flags/i);
-  assert.match(adversarial, installedRootPattern);
+  assert.match(adversarial, activeRootPattern);
   assert.match(adversarial, /Treat `--wait` and `--background` as Codex-side execution controls only/i);
   assert.match(adversarial, /Strip them before calling the companion command/i);
   assert.match(adversarial, /The companion review process itself always runs in the foreground/i);
@@ -126,7 +125,7 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /Do not spawn a review subagent/i);
   assert.match(adversarial, /do not invoke a generic review-runner role/i);
   assert.match(adversarial, /Do not fall back to raw `claude`, `claude-code`, `claude review`, `bash -lc \.\.\.claude\.\.\.`/i);
-  assert.match(adversarial, /If the installed companion command fails, surface that failure/i);
+  assert.match(adversarial, /If the .*companion command fails, surface that failure/i);
   assert.match(adversarial, /For background adversarial review, use Codex's built-in `default` subagent/i);
   assert.match(adversarial, /Do not satisfy background adversarial review by using a generic `claude_review_runner`-style helper role/i);
   assert.match(adversarial, /Never satisfy background adversarial review by running the companion command itself with shell backgrounding/i);
@@ -166,13 +165,13 @@ test("review skills keep background execution outside the companion command", ()
 
 test("rescue skill keeps --background and --wait as host-side controls only", () => {
   const rescue = read("skills/rescue/SKILL.md");
-  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
+  const activeRootPattern = /<plugin-root>\/scripts\/claude-companion\.mjs/i;
 
-  assert.match(rescue, /Do not derive the companion path from this skill file or any cache directory/i);
+  assert.match(rescue, /Resolve `<plugin-root>` as two directories above this `SKILL\.md` file/i);
   assert.match(rescue, /Prefer `\$cc:rescue` when the user wants Claude Code to diagnose the issue, validate a risky change by actually editing or testing, apply fixes from a prior review, or carry a task forward across multiple steps/i);
   assert.match(rescue, /Do not use rescue for "just review this diff" unless the user also wants follow-through work beyond review findings/i);
   assert.match(rescue, /Do not use rescue merely because the main Codex thread plans to fix things after combining its own review with a separate Claude review/i);
-  assert.match(rescue, installedRootPattern);
+  assert.match(rescue, activeRootPattern);
   assert.match(rescue, /`--background` and `--wait` are Codex-side execution controls only/i);
   assert.match(rescue, /Never satisfy background rescue by launching `claude-companion\.mjs task` itself as a detached shell process/i);
   assert.match(rescue, /Never forward either flag to `claude-companion\.mjs task`/i);
@@ -319,26 +318,29 @@ test("rescue parent skill owns resume-candidate exploration", () => {
   assert.match(runtimeSkill, /The parent rescue skill already owns that choice/i);
 });
 
-test("setup skill auto-installs missing hooks before the final setup report", () => {
+test("setup skill repairs native plugin hook feature gates before the final setup report", () => {
   const setup = read("skills/setup/SKILL.md");
 
-  assert.match(setup, /Do not derive the companion path from this skill file or any cache directory/i);
-  assert.match(setup, /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i);
+  assert.match(setup, /Resolve `<plugin-root>` as two directories above this `SKILL\.md` file/i);
+  assert.match(setup, /<plugin-root>\/scripts\/claude-companion\.mjs/i);
   assert.match(setup, /setup --json/i);
-  assert.match(setup, /If setup reports missing hooks, run:/i);
-  assert.match(setup, /node "<installed-plugin-root>\/scripts\/install-hooks\.mjs"/i);
-  assert.match(setup, /rerun the final setup command so the user sees the repaired state immediately/i);
+  assert.match(setup, /missing native plugin hook features/i);
+  assert.match(setup, /hook trust/i);
+  assert.match(setup, /\[features\]\.hooks/i);
+  assert.match(setup, /\[features\]\.plugin_hooks/i);
+  assert.match(setup, /native hook trust hashes/i);
+  assert.doesNotMatch(setup, /install-hooks\.mjs/i);
 });
 
-test("simple runtime skills use the installed plugin path instead of cache-relative placeholders", () => {
+test("simple runtime skills resolve the active plugin root from the skill path", () => {
   const status = read("skills/status/SKILL.md");
   const result = read("skills/result/SKILL.md");
   const cancel = read("skills/cancel/SKILL.md");
-  const installedRootPattern = /<installed-plugin-root>\/scripts\/claude-companion\.mjs/i;
+  const activeRootPattern = /<plugin-root>\/scripts\/claude-companion\.mjs/i;
 
   for (const skillText of [status, result, cancel]) {
-    assert.match(skillText, /Do not derive the companion path from this skill file or any cache directory/i);
-    assert.match(skillText, installedRootPattern);
-    assert.doesNotMatch(skillText, /<plugin-root>/i);
+    assert.match(skillText, /Resolve `<plugin-root>` as two directories above this `SKILL\.md` file/i);
+    assert.match(skillText, activeRootPattern);
+    assert.doesNotMatch(skillText, /<installed-plugin-root>/i);
   }
 });

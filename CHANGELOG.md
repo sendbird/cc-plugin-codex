@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.1
+
+- Switch marketplace installs to Codex native plugin hooks: bundled hooks now load from `hooks/hooks.json` in the active plugin cache with `$PLUGIN_ROOT` instead of writing managed global hook commands into `~/.codex/hooks.json`.
+- Remove the local checkout/stable-root install path from the supported install flow. The installer now uses `marketplace/add` + `plugin/install`, cleans stale `~/.codex/plugins/cc` state, and enables `[features].hooks` plus `[features].plugin_hooks`.
+- Update public skills to resolve the active plugin root from their `SKILL.md` path, so marketplace cache installs run the matching companion code after plugin updates.
+- Refresh README, setup, installer, and E2E coverage around the marketplace/cache-only install path, native hook feature-gate repair, and `$cc:setup` trust repair for this plugin's hook hashes.
+
 ## v1.2.0
 
 - Default the Claude model for `review`, `adversarial-review`, and `rescue`/`task` to `opus` (resolved to the 1M-context variant `claude-opus-4-7[1m]`) with `xhigh` effort. The `sonnet` alias resolves to `claude-sonnet-4-6[1m]` and defaults to `high` effort; `haiku` stays on `claude-haiku-4-5` with effort unset. `--model` and `--effort` remain user-overridable; `xhigh` is now a first-class effort level and `max` is reserved for users who explicitly opt in.

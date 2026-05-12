@@ -233,6 +233,7 @@ export function renderSetupReport(report) {
     `- claude: ${report.claude.detail}`,
     `- auth: ${report.auth.detail}`,
     `- hooks: ${report.hooks.detail}`,
+    ...(report.hookTrust ? [`- hook trust: ${report.hookTrust.detail}`] : []),
     `- review gate: ${report.reviewGateEnabled ? "enabled" : "disabled"}`,
     "",
   ];

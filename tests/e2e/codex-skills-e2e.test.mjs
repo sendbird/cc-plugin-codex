@@ -16,7 +16,6 @@ const PROJECT_ROOT = path.resolve(
 );
 const COMPANION_SCRIPT = path.join(PROJECT_ROOT, "scripts", "claude-companion.mjs");
 const INSTALLER_SCRIPT = path.join(PROJECT_ROOT, "scripts", "installer-cli.mjs");
-const INSTALL_HOOKS_SCRIPT = path.join(PROJECT_ROOT, "scripts", "install-hooks.mjs");
 const RESCUE_SKILL_PATH = path.join(PROJECT_ROOT, "skills", "rescue", "SKILL.md");
 const REVIEW_SKILL_PATH = path.join(PROJECT_ROOT, "skills", "review", "SKILL.md");
 const ADVERSARIAL_REVIEW_SKILL_PATH = path.join(
@@ -171,7 +170,7 @@ function createEnvironment() {
 }
 
 function installHooks(testEnv) {
-  const result = spawnSync(process.execPath, [INSTALL_HOOKS_SCRIPT], {
+  const result = spawnSync(process.execPath, [path.join(PROJECT_ROOT, "scripts", "install-hooks.mjs")], {
     cwd: PROJECT_ROOT,
     env: testEnv.env,
     encoding: "utf8",
@@ -180,28 +179,92 @@ function installHooks(testEnv) {
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
   const hooksFile = path.join(testEnv.codexHome, "hooks.json");
-  assert.ok(fs.existsSync(hooksFile), "Codex hooks should be installed");
+  const configFile = path.join(testEnv.codexHome, "config.toml");
+  const config = fs.readFileSync(configFile, "utf8");
+  assert.ok(!fs.existsSync(hooksFile), "native plugin hooks should not install global hooks");
+  assert.match(config, /hooks = true/);
+  assert.match(config, /plugin_hooks = true/);
+}
+
+function createLocalMarketplaceFixture(testEnv) {
+  const marketplaceRoot = path.join(testEnv.rootDir, "sendbird-marketplace");
+  const pluginRoot = path.join(marketplaceRoot, "plugins", "cc");
+  fs.rmSync(marketplaceRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(pluginRoot), { recursive: true });
+  fs.cpSync(PROJECT_ROOT, pluginRoot, {
+    recursive: true,
+    filter: (sourcePath) => {
+      const relative = path.relative(PROJECT_ROOT, sourcePath);
+      return (
+        relative === "" ||
+        !relative.split(path.sep).some((part) =>
+          [".git", "node_modules", "tasks"].includes(part)
+        )
+      );
+    },
+  });
+  fs.mkdirSync(path.join(marketplaceRoot, ".agents", "plugins"), { recursive: true });
+  fs.writeFileSync(
+    path.join(marketplaceRoot, ".agents", "plugins", "marketplace.json"),
+    `${JSON.stringify(
+      {
+        name: "sendbird",
+        interface: { displayName: "Sendbird Plugins" },
+        plugins: [
+          {
+            name: "cc",
+            source: {
+              source: "local",
+              path: "./plugins/cc",
+            },
+            policy: {
+              installation: "AVAILABLE",
+              authentication: "ON_USE",
+            },
+            category: "Coding",
+          },
+        ],
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return marketplaceRoot;
 }
 
 function installPlugin(testEnv) {
+  const marketplaceRoot = createLocalMarketplaceFixture(testEnv);
   const result = spawnSync(process.execPath, [INSTALLER_SCRIPT, "install"], {
     cwd: PROJECT_ROOT,
-    env: testEnv.env,
+    env: {
+      ...testEnv.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    },
     encoding: "utf8",
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
-  const installDir = path.join(testEnv.codexHome, "plugins", "cc");
-  const marketplaceFile = path.join(testEnv.homeDir, ".agents", "plugins", "marketplace.json");
+  const cacheParent = path.join(testEnv.codexHome, "plugins", "cache", "sendbird", "cc");
   const configFile = path.join(testEnv.codexHome, "config.toml");
+  const cacheDir = fs.existsSync(cacheParent)
+    ? fs
+        .readdirSync(cacheParent, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => path.join(cacheParent, entry.name))
+        .find((candidate) =>
+          fs.existsSync(path.join(candidate, "scripts", "installer-cli.mjs"))
+        )
+    : null;
 
   assert.ok(
-    fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")),
-    "installer should copy the plugin into the Codex home"
+    cacheDir,
+    "installer should install the plugin into the Codex cache"
   );
-  assert.ok(fs.existsSync(marketplaceFile), "installer should register the plugin in the local marketplace");
   assert.ok(fs.existsSync(configFile), "installer should create a Codex config.toml");
+  return cacheDir;
 }
 
 function installPluginWithEnv(testEnv, extraEnv = {}) {
@@ -1586,60 +1649,6 @@ describe("Codex rescue-skill E2E", () => {
 });
 
 describe("Codex direct-skill E2E", () => {
-  it("uses fallback-installed cc-review wrappers when plugin/install is unavailable", async (t) => {
-    if (!codexAvailable()) {
-      t.skip("codex CLI is not available in this environment");
-      return;
-    }
-
-    const testEnv = createEnvironment();
-    const workspaceDir = path.join(testEnv.rootDir, "fallback-review-workspace");
-    fs.mkdirSync(workspaceDir, { recursive: true });
-    setupGitWorkspace(workspaceDir);
-    fs.writeFileSync(
-      path.join(workspaceDir, "app.js"),
-      "export function value() {\n  return 5;\n}\n",
-      "utf8"
-    );
-
-    const fallbackCodex = createMethodNotFoundCodex(testEnv);
-    installPluginWithEnv(testEnv, fallbackCodex.env);
-    assert.ok(
-      fs.existsSync(path.join(testEnv.codexHome, "skills", "cc-review", "SKILL.md")),
-      "fallback install should create a Codex-native cc-review wrapper"
-    );
-
-    const userRequest = "$cc:review --wait --scope working-tree --model haiku";
-    const provider = startDirectSkillProvider({
-      userRequest,
-      expectedNeedles: ["Claude Code Review"],
-      shellCommands: [
-        `node ${JSON.stringify(COMPANION_SCRIPT)} review --view-state on-success --scope working-tree --model haiku`,
-      ],
-      cwd: workspaceDir,
-    });
-    testEnv.providerPort = await provider.listen();
-    writeConfigToml(testEnv, testEnv.providerPort);
-
-    try {
-      const execResult = await runCodexExec(testEnv, userRequest, { cwd: workspaceDir });
-
-      assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
-      const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8");
-      assert.match(finalMessage, /Claude Code Review/);
-      const claudeInvocations = readClaudeInvocations(testEnv.claudeLogFile);
-      assert.ok(
-        claudeInvocations.some(
-          (entry) => entry.args.includes("--model") && entry.args.includes("claude-haiku-4-5")
-        ),
-        "fallback-installed wrapper should still route the requested model alias to Claude"
-      );
-    } finally {
-      await provider.close();
-      cleanupEnvironment(testEnv);
-    }
-  });
-
   it("uses the installed plugin review skill without running $cc:setup first", async (t) => {
     if (!codexAvailable()) {
       t.skip("codex CLI is not available in this environment");
@@ -1656,14 +1665,15 @@ describe("Codex direct-skill E2E", () => {
       "utf8"
     );
 
-    installPlugin(testEnv);
+    const pluginRoot = installPlugin(testEnv);
 
     const userRequest = "$cc:review --wait --scope working-tree --model haiku";
+    const companionScript = path.join(pluginRoot, "scripts", "claude-companion.mjs");
     const provider = startDirectSkillProvider({
       userRequest,
       expectedNeedles: ["Claude Code Review"],
       shellCommands: [
-        `node ${JSON.stringify(COMPANION_SCRIPT)} review --view-state on-success --scope working-tree --model haiku`,
+        `node ${JSON.stringify(companionScript)} review --view-state on-success --scope working-tree --model haiku`,
       ],
       cwd: workspaceDir,
     });
@@ -2090,7 +2100,7 @@ describe("Codex direct-skill E2E", () => {
     }
   });
 
-  it("auto-installs hooks during $cc:setup when the json probe reports they are missing", async (t) => {
+  it("repairs native plugin hook feature gates during $cc:setup", async (t) => {
     if (!codexAvailable()) {
       t.skip("codex CLI is not available in this environment");
       return;
@@ -2103,7 +2113,6 @@ describe("Codex direct-skill E2E", () => {
       expectedNeedles: ["Claude Code Setup"],
       shellCommands: [
         `node ${JSON.stringify(COMPANION_SCRIPT)} setup --json`,
-        `node ${JSON.stringify(INSTALL_HOOKS_SCRIPT)}`,
         `node ${JSON.stringify(COMPANION_SCRIPT)} setup`,
       ],
     });
@@ -2119,17 +2128,20 @@ describe("Codex direct-skill E2E", () => {
       assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
       const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8");
       assert.match(finalMessage, /Status: ready/i);
-      assert.match(finalMessage, /hooks: Codex hooks installed/i);
+      assert.match(finalMessage, /hooks: native Codex plugin hooks enabled/i);
 
       const hooksFile = path.join(testEnv.codexHome, "hooks.json");
-      assert.ok(fs.existsSync(hooksFile), "setup should install hooks when they are missing");
+      const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
+      assert.ok(!fs.existsSync(hooksFile), "setup should not install global hooks");
+      assert.match(config, /hooks = true/);
+      assert.match(config, /plugin_hooks = true/);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);
     }
   });
 
-  it("auto-installs hooks during $cc:setup --enable-review-gate when the json probe reports they are missing", async (t) => {
+  it("repairs native plugin hooks during $cc:setup --enable-review-gate", async (t) => {
     if (!codexAvailable()) {
       t.skip("codex CLI is not available in this environment");
       return;
@@ -2142,7 +2154,6 @@ describe("Codex direct-skill E2E", () => {
       expectedNeedles: ["Claude Code Setup"],
       shellCommands: [
         `node ${JSON.stringify(COMPANION_SCRIPT)} setup --json --enable-review-gate`,
-        `node ${JSON.stringify(INSTALL_HOOKS_SCRIPT)}`,
         `node ${JSON.stringify(COMPANION_SCRIPT)} setup --enable-review-gate`,
       ],
     });
@@ -2158,15 +2169,15 @@ describe("Codex direct-skill E2E", () => {
       assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
       const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8");
       assert.match(finalMessage, /Status: ready/i);
-      assert.match(finalMessage, /hooks: Codex hooks installed/i);
+      assert.match(finalMessage, /hooks: native Codex plugin hooks enabled/i);
       assert.match(finalMessage, /review gate: enabled/i);
       assert.match(finalMessage, /Enabled the stop-time review gate/i);
 
       const hooksFile = path.join(testEnv.codexHome, "hooks.json");
-      assert.ok(
-        fs.existsSync(hooksFile),
-        "setup --enable-review-gate should still install hooks when they are missing"
-      );
+      const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
+      assert.ok(!fs.existsSync(hooksFile));
+      assert.match(config, /hooks = true/);
+      assert.match(config, /plugin_hooks = true/);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);

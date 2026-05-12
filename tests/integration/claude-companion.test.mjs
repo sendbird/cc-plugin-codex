@@ -164,6 +164,69 @@ function createTestEnvironment() {
   };
 }
 
+function createFakeCodexAppServer(testEnv, hooks) {
+  const serverPath = path.join(testEnv.rootDir, "fake-codex-app-server.mjs");
+  const logPath = path.join(testEnv.rootDir, "fake-codex-app-server.ndjson");
+  fs.writeFileSync(
+    serverPath,
+    `import fs from "node:fs";
+import readline from "node:readline";
+
+const hooks = ${JSON.stringify(hooks, null, 2)};
+const logPath = ${JSON.stringify(logPath)};
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+
+function write(message) {
+  process.stdout.write(JSON.stringify(message) + "\\n");
+}
+
+rl.on("line", (line) => {
+  const message = JSON.parse(line);
+  fs.appendFileSync(logPath, JSON.stringify(message) + "\\n", "utf8");
+  if (message.method === "initialize") {
+    write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2024-11-05" } });
+    return;
+  }
+  if (message.method === "hooks/list") {
+    write({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        data: (message.params?.cwds || []).map((cwd) => ({
+          cwd,
+          hooks,
+          warnings: [],
+          errors: [],
+        })),
+      },
+    });
+    return;
+  }
+  if (message.method === "config/batchWrite") {
+    write({ jsonrpc: "2.0", id: message.id, result: { status: "ok" } });
+    return;
+  }
+  write({
+    jsonrpc: "2.0",
+    id: message.id,
+    error: { code: -32601, message: "method not found" },
+  });
+});
+`,
+    "utf8"
+  );
+  return { serverPath, logPath };
+}
+
+function readJsonLines(filePath) {
+  return fs
+    .readFileSync(filePath, "utf8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
 function cleanupTestEnvironment(testEnv) {
   for (let attempt = 0; attempt < 20; attempt++) {
     try {
@@ -547,6 +610,123 @@ describe("claude-companion integration", () => {
         { env: testEnv.env }
       );
       assert.equal(afterDisable.reviewGateEnabled, false);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("setup trusts current native plugin hooks through Codex hooks/list", () => {
+    const testEnv = createTestEnvironment();
+    const sourcePath = path.join(PROJECT_ROOT, "hooks", "hooks.json");
+    const hooks = [
+      {
+        key: "cc@sendbird:hooks/hooks.json:session_start:0:0",
+        eventName: "session_start",
+        handlerType: "command",
+        matcher: null,
+        command: "node session-lifecycle-hook.mjs",
+        timeoutSec: 600,
+        statusMessage: null,
+        sourcePath,
+        source: "plugin",
+        pluginId: "cc@sendbird",
+        displayOrder: 0,
+        enabled: true,
+        isManaged: false,
+        currentHash: "sha256:session",
+        trustStatus: "untrusted",
+      },
+      {
+        key: "cc@sendbird:hooks/hooks.json:stop:0:0",
+        eventName: "stop",
+        handlerType: "command",
+        matcher: null,
+        command: "node stop-review-gate-hook.mjs",
+        timeoutSec: 600,
+        statusMessage: null,
+        sourcePath,
+        source: "plugin",
+        pluginId: "cc@sendbird",
+        displayOrder: 1,
+        enabled: true,
+        isManaged: false,
+        currentHash: "sha256:stop",
+        trustStatus: "modified",
+      },
+      {
+        key: "cc@sendbird:hooks/hooks.json:user_prompt_submit:0:0",
+        eventName: "user_prompt_submit",
+        handlerType: "command",
+        matcher: null,
+        command: "node unread-result-hook.mjs",
+        timeoutSec: 600,
+        statusMessage: null,
+        sourcePath,
+        source: "plugin",
+        pluginId: "cc@sendbird",
+        displayOrder: 2,
+        enabled: true,
+        isManaged: false,
+        currentHash: "sha256:already",
+        trustStatus: "trusted",
+      },
+      {
+        key: "other@sendbird:hooks/hooks.json:session_start:0:0",
+        eventName: "session_start",
+        handlerType: "command",
+        matcher: null,
+        command: "node other.mjs",
+        timeoutSec: 600,
+        statusMessage: null,
+        sourcePath: path.join(testEnv.rootDir, "other", "hooks.json"),
+        source: "plugin",
+        pluginId: "other@sendbird",
+        displayOrder: 3,
+        enabled: true,
+        isManaged: false,
+        currentHash: "sha256:other",
+        trustStatus: "untrusted",
+      },
+    ];
+    const fakeCodex = createFakeCodexAppServer(testEnv, hooks);
+
+    try {
+      const report = runCompanionJson(
+        ["setup", "--cwd", testEnv.workspaceDir, "--json"],
+        {
+          env: {
+            ...testEnv.env,
+            CC_PLUGIN_CODEX_EXECUTABLE: process.execPath,
+            CC_PLUGIN_CODEX_APP_SERVER_ARGS_JSON: JSON.stringify([fakeCodex.serverPath]),
+            CC_PLUGIN_CODEX_FORCE_HOOK_TRUST: "1",
+          },
+        }
+      );
+
+      assert.equal(report.ready, true);
+      assert.equal(report.hookTrust.ready, true);
+      assert.equal(report.hookTrust.found, 3);
+      assert.equal(report.hookTrust.trusted, 2);
+      assert.match(report.hookTrust.detail, /trusted 2 native plugin hooks/i);
+
+      const requests = readJsonLines(fakeCodex.logPath);
+      const writeRequest = requests.find((request) => request.method === "config/batchWrite");
+      assert.ok(writeRequest, "expected setup to write hook trust state");
+      assert.deepEqual(writeRequest.params.edits, [
+        {
+          keyPath: "hooks.state",
+          value: {
+            "cc@sendbird:hooks/hooks.json:session_start:0:0": {
+              trusted_hash: "sha256:session",
+            },
+            "cc@sendbird:hooks/hooks.json:stop:0:0": {
+              trusted_hash: "sha256:stop",
+            },
+          },
+          mergeStrategy: "upsert",
+        },
+      ]);
+      assert.equal(writeRequest.params.reloadUserConfig, true);
     } finally {
       cleanupTestEnvironment(testEnv);
     }

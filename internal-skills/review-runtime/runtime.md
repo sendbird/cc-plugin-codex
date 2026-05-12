@@ -2,17 +2,17 @@
 
 Use this document only when the main Codex thread or a built-in forwarding child is executing a Claude Code `review` or `adversarial-review` command.
 This is an internal runtime reference, not a public skill. It captures the exact companion-command contract and the foreground/background execution boundary.
-The public skill already resolved the installed plugin root. Reuse that installed copy path here. Do not derive a new runtime path from this document, any cache directory, or the current working tree.
+The public skill already resolved the active plugin root from its `SKILL.md` path. Reuse that path here. Do not derive a new runtime path from this document or the current working tree.
 
 Primary helper:
-- `node "<installed-plugin-root>/scripts/claude-companion.mjs" review ...`
-- `node "<installed-plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
+- `node "<plugin-root>/scripts/claude-companion.mjs" review ...`
+- `node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
 
 Execution boundary:
 - Foreground review stays on the main Codex thread. Do not satisfy foreground review through a review subagent, a generic review-runner role, or any background worker abstraction.
 - Background review uses exactly one built-in forwarding child through `spawn_agent`.
 - Never satisfy either mode with raw `claude`, `claude-code`, `claude review`, hand-rolled `bash -lc ...claude...`, or detached companion shell backgrounding.
-- If the installed companion command fails, surface that failure instead of improvising a different executor.
+- If the resolved companion command fails, surface that failure instead of improvising a different executor.
 
 Foreground contract:
 - Strip `--wait` and `--background` before building the companion command.

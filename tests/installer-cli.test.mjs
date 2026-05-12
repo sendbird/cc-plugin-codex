@@ -772,61 +772,7 @@ afterEach(() => {
 });
 
 describe("installer-cli", () => {
-  it("installs into ~/.codex/plugins/cc and registers the plugin in the personal marketplace", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
-    copyFixture(sourceRoot);
-
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-
-    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "local-plugins", "cc", "local");
-    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
-    const configFile = path.join(homeDir, ".codex", "config.toml");
-    const hooksFile = path.join(homeDir, ".codex", "hooks.json");
-    const fallbackSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
-    const fallbackPromptPath = path.join(homeDir, ".codex", "prompts", "cc-review.md");
-    const installedReviewSkill = path.join(installDir, "skills", "review", "SKILL.md");
-    const cachedReviewSkill = path.join(cacheDir, "skills", "review", "SKILL.md");
-    const normalizedInstallDir = installDir.replace(/\\/g, "/");
-
-    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
-    assert.ok(fs.existsSync(path.join(cacheDir, "skills", "review", "SKILL.md")));
-    assert.ok(!fs.existsSync(fallbackSkillPath));
-    assert.ok(!fs.existsSync(fallbackPromptPath));
-    assert.ok(fs.readFileSync(installedReviewSkill, "utf8").includes(normalizedInstallDir));
-    assert.doesNotMatch(fs.readFileSync(installedReviewSkill, "utf8"), /<installed-plugin-root>/i);
-    assert.ok(fs.readFileSync(cachedReviewSkill, "utf8").includes(normalizedInstallDir));
-    assert.doesNotMatch(fs.readFileSync(cachedReviewSkill, "utf8"), /<installed-plugin-root>/i);
-
-    const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
-    assert.equal(marketplace.plugins[0].name, "cc");
-    assert.equal(marketplace.plugins[0].source.path, "./.codex/plugins/cc");
-
-    const config = fs.readFileSync(configFile, "utf8");
-    assert.match(config, /\[plugins\."cc@local-plugins"\]/);
-    assert.match(config, /enabled = true/);
-    assert.match(config, /\[features\]/);
-    assert.match(config, /codex_hooks = true/);
-
-    const hooks = JSON.parse(fs.readFileSync(hooksFile, "utf8"));
-    const sessionStartCommand = hooks.hooks.SessionStart[0].hooks[0].command;
-    assert.ok(sessionStartCommand.includes(`${installDir}/hooks/session-lifecycle-hook.mjs`));
-    assert.ok(!sessionStartCommand.includes(sourceRoot));
-
-    const requests = readFakeCodexLog(fakeCodex.logPath);
-    assert.ok(
-      requests.some((request) => request.method === "plugin/install"),
-      "installer should use Codex's official plugin/install path"
-    );
-    assert.ok(
-      !requests.some((request) => request.method === "marketplace/add"),
-      "npx install should install the current package directly instead of redirecting through a marketplace by default"
-    );
-  });
-
-  it("prefers Codex marketplace/add when an official marketplace source is configured", () => {
+  it("installs through Codex marketplace/add and plugin/install into the plugin cache", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
     const fakeCodex = createMarketplaceAwareCodex(homeDir);
@@ -842,13 +788,23 @@ describe("installer-cli", () => {
     const configFile = path.join(homeDir, ".codex", "config.toml");
     const config = fs.readFileSync(configFile, "utf8");
     const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
+    const hooksFile = path.join(homeDir, ".codex", "hooks.json");
+    const legacyInstallDir = path.join(homeDir, ".codex", "plugins", "cc");
+    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "sendbird", "cc", "local");
+    const cachedReviewSkill = path.join(cacheDir, "skills", "review", "SKILL.md");
     const requests = readFakeCodexLog(fakeCodex.logPath);
     const pluginInstallRequest = requests.find((request) => request.method === "plugin/install");
 
     assert.match(config, /\[plugins\."cc@sendbird"\]/);
+    assert.match(config, /hooks = true/);
+    assert.match(config, /plugin_hooks = true/);
+    assert.ok(!fs.existsSync(legacyInstallDir), "installer should not create a stable local plugin root");
+    assert.ok(!fs.existsSync(hooksFile), "installer should not write global hooks.json");
+    assert.ok(fs.existsSync(cachedReviewSkill));
+    assert.match(fs.readFileSync(cachedReviewSkill, "utf8"), /<plugin-root>\/scripts\/claude-companion\.mjs/);
     assert.ok(
       requests.some((request) => request.method === "marketplace/add"),
-      "installer should prefer Codex marketplace/add when a marketplace source is configured"
+      "installer should call Codex marketplace/add"
     );
     assert.equal(
       pluginInstallRequest?.params?.marketplacePath,
@@ -860,58 +816,47 @@ describe("installer-cli", () => {
     );
   });
 
-  it("falls back to the personal marketplace entry when marketplace/add is unavailable", () => {
+  it("does not fall back to local config activation when marketplace/add is unavailable", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
     const fakeCodex = createMethodNotFoundCodex(homeDir);
     copyFixture(sourceRoot);
     const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    const result = runInstaller("install", homeDir, sourceRoot, {
-      ...fakeCodex.env,
-      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
-      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
-    });
+    const result = spawnSync(
+      process.execPath,
+      [path.join(sourceRoot, "scripts", "installer-cli.mjs"), "install"],
+      {
+        cwd: sourceRoot,
+        env: {
+          ...process.env,
+          HOME: homeDir,
+          USERPROFILE: homeDir,
+          ...fakeCodex.env,
+          CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+          CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+        },
+        encoding: "utf8",
+      }
+    );
 
-    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
-    const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
     const config = fs.readFileSync(path.join(homeDir, ".codex", "config.toml"), "utf8");
 
-    assert.equal(marketplace.name, "sendbird");
-    assert.equal(marketplace.plugins[0].name, "cc");
-    assert.match(config, /\[plugins\."cc@sendbird"\]/);
-    assert.match(result.stderr, /marketplace\/add unavailable/i);
-    assert.match(result.stderr, /config fallback/i);
+    assert.notEqual(result.status, 0, "marketplace/add failure should fail install");
+    assert.doesNotMatch(config, /\[plugins\."cc@sendbird"\]/);
+    assert.ok(!fs.existsSync(path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md")));
+    assert.ok(!fs.existsSync(path.join(homeDir, ".agents", "plugins", "marketplace.json")));
   });
 
-  it("materializes installed skill paths for a direct local checkout install", () => {
+  it("rejects direct local checkout installs", () => {
     const homeDir = makeTempHome();
     const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const fakeCodex = createFakeCodex(homeDir);
     copyFixture(installDir);
 
-    runLocalPluginInstaller("install", installDir, homeDir, fakeCodex.env);
+    const result = runLocalPluginInstallerExpectFailure("install", installDir, homeDir);
 
-    const installedReviewSkill = path.join(installDir, "skills", "review", "SKILL.md");
-    const skillText = fs.readFileSync(installedReviewSkill, "utf8");
-    const normalizedInstallDir = installDir.replace(/\\/g, "/");
-
-    assert.ok(skillText.includes(normalizedInstallDir));
-    assert.doesNotMatch(skillText, /<installed-plugin-root>/i);
-  });
-
-  it("rejects direct source-root installs outside the managed plugin directory", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
-    copyFixture(sourceRoot);
-
-    const result = runLocalPluginInstallerExpectFailure("install", sourceRoot, homeDir, fakeCodex.env);
-    const expectedInstallDir = path.join(homeDir, ".codex", "plugins", "cc").replace(/\\/g, "/");
-
-    assert.match(result.stderr, /Unsupported --plugin-root/i);
-    assert.match(result.stderr.replace(/\\/g, "/"), new RegExp(expectedInstallDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(result.stderr, /npx cc-plugin-codex install/i);
+    assert.match(result.stderr, /Local checkout installs are no longer supported/i);
+    assert.match(result.stderr, /codex marketplace add sendbird\/codex-marketplace/i);
   });
 
   it("installs successfully when CODEX_HOME is outside the user's home directory", () => {
@@ -919,91 +864,34 @@ describe("installer-cli", () => {
     const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "cc-external-codex-home-"));
     tempHomes.push(codexHome);
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir, codexHome);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir, codexHome);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    runInstaller("install", homeDir, sourceRoot, { ...fakeCodex.env, CODEX_HOME: codexHome });
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CODEX_HOME: codexHome,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
-    const installDir = path.join(codexHome, "plugins", "cc");
-    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
-    const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
-    const expectedPath = `./${path.relative(homeDir, installDir).replace(/\\/g, "/")}`;
+    const cacheDir = path.join(codexHome, "plugins", "cache", "sendbird", "cc", "local");
 
-    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
-    assert.equal(marketplace.plugins[0].source.path, expectedPath);
-    assert.ok(expectedPath.includes(".."));
+    assert.ok(fs.existsSync(path.join(cacheDir, "scripts", "installer-cli.mjs")));
   });
 
-  it("falls back to config-based activation when plugin/install is unsupported", () => {
+  it("removes stale fallback skill wrappers and legacy global hooks when official install succeeds", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createMethodNotFoundCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
-
-    const result = runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-
-    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "local-plugins", "cc", "local");
-    const fallbackSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
-    const fallbackPromptPath = path.join(homeDir, ".codex", "prompts", "cc-review.md");
-    const configFile = path.join(homeDir, ".codex", "config.toml");
-    const hooksFile = path.join(homeDir, ".codex", "hooks.json");
-    const config = fs.readFileSync(configFile, "utf8");
-    const requests = readFakeCodexLog(fakeCodex.logPath);
-
-    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
-    assert.ok(fs.existsSync(hooksFile), "fallback install should still install managed hooks");
-    assert.match(config, /\[plugins\."cc@local-plugins"\]/);
-    assert.match(config, /enabled = true/);
-    assert.ok(!fs.existsSync(cacheDir), "fallback install should still avoid relying on the Codex cache path");
-    assert.ok(fs.existsSync(fallbackSkillPath), "fallback install should expose a Codex-native skill wrapper");
-    assert.ok(fs.existsSync(fallbackPromptPath), "fallback install should expose a matching prompt wrapper");
-    assert.match(fs.readFileSync(fallbackSkillPath, "utf8"), /^---\nname: cc:review\n/m);
-    assert.match(fs.readFileSync(fallbackPromptPath, "utf8"), /Use the \$cc:review skill/);
-    assert.ok(
-      requests.some((request) => request.method === "plugin/install"),
-      "fallback install should still try plugin/install first"
-    );
-    assert.match(result.stderr, /config fallback/i);
-  });
-
-  it("falls back to config-based activation when plugin/install hangs", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createHangingCodex(homeDir);
-    copyFixture(sourceRoot);
-
-    const result = runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-
-    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const fallbackSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
-    const configFile = path.join(homeDir, ".codex", "config.toml");
-    const hooksFile = path.join(homeDir, ".codex", "hooks.json");
-    const config = fs.readFileSync(configFile, "utf8");
-    const requests = readFakeCodexLog(fakeCodex.logPath);
-
-    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
-    assert.ok(fs.existsSync(hooksFile), "timeout fallback install should still install managed hooks");
-    assert.match(config, /\[plugins\."cc@local-plugins"\]/);
-    assert.match(config, /enabled = true/);
-    assert.ok(fs.existsSync(fallbackSkillPath), "timeout fallback should also install skill wrappers");
-    assert.ok(
-      requests.some((request) => request.method === "plugin/install"),
-      "timeout fallback install should still try plugin/install first"
-    );
-    assert.match(result.stderr, /timed out waiting for plugin\/install/i);
-    assert.match(result.stderr, /config fallback/i);
-  });
-
-  it("removes stale fallback skill wrappers when official plugin/install succeeds", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
-    copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
     const staleSkillPath = path.join(homeDir, ".codex", "skills", "cc-review", "SKILL.md");
     const stalePromptPath = path.join(homeDir, ".codex", "prompts", "cc-review.md");
     const unrelatedSkillPath = path.join(homeDir, ".codex", "skills", "keep-me", "SKILL.md");
+    const legacyInstallDir = path.join(homeDir, ".codex", "plugins", "cc");
+    const hooksFile = path.join(homeDir, ".codex", "hooks.json");
 
     fs.mkdirSync(path.dirname(staleSkillPath), { recursive: true });
     fs.writeFileSync(staleSkillPath, "stale wrapper\n", "utf8");
@@ -1011,9 +899,32 @@ describe("installer-cli", () => {
     fs.writeFileSync(stalePromptPath, "stale prompt\n", "utf8");
     fs.mkdirSync(path.dirname(unrelatedSkillPath), { recursive: true });
     fs.writeFileSync(unrelatedSkillPath, "leave me alone\n", "utf8");
+    fs.mkdirSync(path.join(legacyInstallDir, "hooks"), { recursive: true });
+    fs.writeFileSync(path.join(legacyInstallDir, "hooks", "session-lifecycle-hook.mjs"), "", "utf8");
+    fs.writeFileSync(
+      hooksFile,
+      JSON.stringify({
+        hooks: {
+          SessionStart: [{
+            matcher: "",
+            hooks: [{
+              type: "command",
+              command: `node "${path.join(legacyInstallDir, "hooks", "session-lifecycle-hook.mjs")}"`,
+            }],
+          }],
+        },
+      }, null, 2) + "\n",
+      "utf8"
+    );
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
+    assert.ok(!fs.existsSync(legacyInstallDir));
+    assert.ok(!fs.existsSync(hooksFile));
     assert.ok(!fs.existsSync(staleSkillPath));
     assert.ok(!fs.existsSync(stalePromptPath));
     assert.ok(fs.existsSync(unrelatedSkillPath), "official install should not remove unrelated user skills");
@@ -1022,8 +933,9 @@ describe("installer-cli", () => {
   it("uninstalls cleanly while preserving unrelated user config", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
     const marketplaceDir = path.join(homeDir, ".agents", "plugins");
     fs.mkdirSync(marketplaceDir, { recursive: true });
@@ -1083,7 +995,11 @@ describe("installer-cli", () => {
       "utf8"
     );
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
     const marketplacePath = path.join(homeDir, ".agents", "plugins", "marketplace.json");
     const marketplaceBeforeUninstall = JSON.parse(fs.readFileSync(marketplacePath, "utf8"));
@@ -1122,10 +1038,15 @@ describe("installer-cli", () => {
   it("removes versioned marketplace cache entries during uninstall", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
     const versionedCacheDir = path.join(
       homeDir,
@@ -1149,13 +1070,18 @@ describe("installer-cli", () => {
     assert.ok(!fs.existsSync(path.dirname(versionedCacheDir)));
   });
 
-  it("removes managed hook commands that point at versioned marketplace cache roots", () => {
+  it("removes legacy managed hook commands that point at versioned marketplace cache roots", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+    runInstaller("install", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
     const codexDir = path.join(homeDir, ".codex");
     const versionedCacheDir = path.join(
@@ -1203,13 +1129,36 @@ describe("installer-cli", () => {
     assert.ok(!fs.existsSync(hooksFile), "uninstall should remove managed hooks even when they point at a versioned cache root");
   });
 
-  it("removes managed hooks before calling Codex plugin/uninstall", () => {
+  it("removes legacy managed hooks before calling Codex plugin/uninstall", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
     const fakeCodex = createUninstallOrderCodex(homeDir);
     copyFixture(sourceRoot);
+    const codexDir = path.join(homeDir, ".codex");
+    const cacheDir = path.join(codexDir, "plugins", "cache", "sendbird", "cc", "local");
+    const hooksFile = path.join(codexDir, "hooks.json");
+    fs.mkdirSync(path.join(cacheDir, "hooks"), { recursive: true });
+    fs.writeFileSync(
+      path.join(codexDir, "config.toml"),
+      '[plugins."cc@sendbird"]\nenabled = true\n',
+      "utf8"
+    );
+    fs.writeFileSync(
+      hooksFile,
+      JSON.stringify({
+        hooks: {
+          SessionStart: [{
+            matcher: "",
+            hooks: [{
+              type: "command",
+              command: `node "${path.join(cacheDir, "hooks", "session-lifecycle-hook.mjs")}"`,
+            }],
+          }],
+        },
+      }, null, 2) + "\n",
+      "utf8"
+    );
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
     runInstaller("uninstall", homeDir, sourceRoot, fakeCodex.env);
 
     const inspect = JSON.parse(fs.readFileSync(fakeCodex.inspectPath, "utf8"));
@@ -1220,164 +1169,40 @@ describe("installer-cli", () => {
     );
   });
 
-  it("self-cleans managed hooks after a Codex-side plugin uninstall", () => {
+  it("keeps install/update idempotent while refreshing the cached copy", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
+    const installEnv = {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    };
 
-    const codexDir = path.join(homeDir, ".codex");
-    const installDir = path.join(codexDir, "plugins", "cc");
-    const cacheDir = path.join(codexDir, "plugins", "cache", "local-plugins", "cc", "local");
-    const configFile = path.join(codexDir, "config.toml");
-    const hooksFile = path.join(codexDir, "hooks.json");
-    const fallbackSkillPath = path.join(codexDir, "skills", "cc-review", "SKILL.md");
-    const fallbackPromptPath = path.join(codexDir, "prompts", "cc-review.md");
+    runInstaller("install", homeDir, sourceRoot, installEnv);
+    runInstaller("install", homeDir, sourceRoot, installEnv);
 
-    fs.mkdirSync(path.dirname(fallbackSkillPath), { recursive: true });
-    fs.writeFileSync(fallbackSkillPath, "stale fallback skill\n", "utf8");
-    fs.mkdirSync(path.dirname(fallbackPromptPath), { recursive: true });
-    fs.writeFileSync(fallbackPromptPath, "stale fallback prompt\n", "utf8");
-
-    fs.writeFileSync(
-      configFile,
-      fs
-        .readFileSync(configFile, "utf8")
-        .replace(/\n?\[plugins\."cc@local-plugins"\][\s\S]*?(?=\n\[|$)/, "\n"),
-      "utf8"
-    );
-    fs.rmSync(cacheDir, { recursive: true, force: true });
-
-    const result = spawnSync(
-      process.execPath,
-      [path.join(installDir, "hooks", "session-lifecycle-hook.mjs"), "SessionStart"],
-      {
-        cwd: installDir,
-        env: {
-          ...process.env,
-          HOME: homeDir,
-          USERPROFILE: homeDir,
-        },
-        input: JSON.stringify({
-          cwd: installDir,
-          session_id: "session-cleanup-test",
-          hook_event_name: "SessionStart",
-        }),
-        encoding: "utf8",
-      }
-    );
-
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-
-    const cleanedConfig = fs.readFileSync(configFile, "utf8");
-    assert.ok(!fs.existsSync(hooksFile), "cleanup should remove managed global hooks once the plugin is uninstalled");
-    assert.ok(!fs.existsSync(fallbackSkillPath), "cleanup should also remove managed fallback skill wrappers");
-    assert.ok(!fs.existsSync(fallbackPromptPath), "cleanup should also remove managed fallback prompt wrappers");
-
-    const marketplace = JSON.parse(
-      fs.readFileSync(path.join(homeDir, ".agents", "plugins", "marketplace.json"), "utf8")
-    );
-    assert.equal(
-      marketplace.plugins.filter((plugin) => plugin.name === "cc").length,
-      1,
-      "cleanup should keep the personal marketplace entry so Codex can reinstall the plugin later"
-    );
-  });
-
-  it("does not self-clean managed hooks when only the Codex cache disappears", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
-    copyFixture(sourceRoot);
-
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-
-    const codexDir = path.join(homeDir, ".codex");
-    const installDir = path.join(codexDir, "plugins", "cc");
-    const cacheDir = path.join(codexDir, "plugins", "cache", "local-plugins", "cc", "local");
-    const hooksFile = path.join(codexDir, "hooks.json");
-    fs.rmSync(cacheDir, { recursive: true, force: true });
-
-    const result = spawnSync(
-      process.execPath,
-      [path.join(installDir, "hooks", "session-lifecycle-hook.mjs"), "SessionStart"],
-      {
-        cwd: installDir,
-        env: {
-          ...process.env,
-          HOME: homeDir,
-          USERPROFILE: homeDir,
-        },
-        input: JSON.stringify({
-          cwd: installDir,
-          session_id: "session-cache-miss-test",
-          hook_event_name: "SessionStart",
-        }),
-        encoding: "utf8",
-      }
-    );
-
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.ok(
-      fs.existsSync(hooksFile),
-      "cache loss alone should not remove managed hooks while the plugin remains enabled"
-    );
-  });
-
-  it("keeps install/update idempotent while refreshing the installed copy", () => {
-    const homeDir = makeTempHome();
-    const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
-    copyFixture(sourceRoot);
-
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-    runInstaller("install", homeDir, sourceRoot, fakeCodex.env);
-
-    const readmePath = path.join(sourceRoot, "README.md");
+    const readmePath = path.join(marketplaceRoot, "plugins", "cc", "README.md");
     fs.appendFileSync(
       readmePath,
       "\n<!-- installer-cli update regression marker -->\n",
       "utf8"
     );
 
-    runInstaller("update", homeDir, sourceRoot, fakeCodex.env);
+    runInstaller("update", homeDir, sourceRoot, installEnv);
 
-    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const installedReadme = fs.readFileSync(path.join(installDir, "README.md"), "utf8");
-    const marketplace = JSON.parse(
-      fs.readFileSync(path.join(homeDir, ".agents", "plugins", "marketplace.json"), "utf8")
-    );
+    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "sendbird", "cc", "local");
+    const cachedReadme = fs.readFileSync(path.join(cacheDir, "README.md"), "utf8");
     const config = fs.readFileSync(path.join(homeDir, ".codex", "config.toml"), "utf8");
-    const hooks = JSON.parse(fs.readFileSync(path.join(homeDir, ".codex", "hooks.json"), "utf8"));
-    const sessionStartCommands = hooks.hooks.SessionStart.flatMap((entry) =>
-      entry.hooks.map((hook) => hook.command)
-    );
-    const sessionEndCommands = hooks.hooks.SessionEnd.flatMap((entry) =>
-      entry.hooks.map((hook) => hook.command)
-    );
 
-    assert.match(installedReadme, /installer-cli update regression marker/);
+    assert.match(cachedReadme, /installer-cli update regression marker/);
     assert.equal(
-      marketplace.plugins.filter((plugin) => plugin.name === "cc").length,
+      countOccurrences(config, /\[plugins\."cc@sendbird"\]/g),
       1,
-      "installer should not duplicate marketplace registrations across install/update runs"
-    );
-    assert.equal(
-      countOccurrences(config, /\[plugins\."cc@local-plugins"\]/g),
-      1,
-      "installer should keep exactly one local plugin enablement block"
-    );
-    assert.equal(
-      sessionStartCommands.filter((command) => command.includes("session-lifecycle-hook.mjs")).length,
-      1,
-      "installer should keep a single SessionStart lifecycle hook"
-    );
-    assert.equal(
-      sessionEndCommands.filter((command) => command.includes("session-lifecycle-hook.mjs")).length,
-      1,
-      "installer should keep a single SessionEnd lifecycle hook"
+      "installer should keep exactly one Sendbird plugin enablement block"
     );
   });
 
@@ -1394,33 +1219,25 @@ describe("installer-cli", () => {
   it("shell installer wrappers install and uninstall the plugin end to end", () => {
     const homeDir = makeTempHome();
     const sourceRoot = makeTempSource();
-    const fakeCodex = createFakeCodex(homeDir);
+    const fakeCodex = createMarketplaceAwareCodex(homeDir);
     copyFixture(sourceRoot);
+    const marketplaceRoot = copyMarketplaceFixture(sourceRoot);
 
-    runShellWrapper("install.sh", homeDir, sourceRoot, fakeCodex.env);
+    runShellWrapper("install.sh", homeDir, sourceRoot, {
+      ...fakeCodex.env,
+      CC_PLUGIN_CODEX_MARKETPLACE_SOURCE: marketplaceRoot,
+      CC_PLUGIN_CODEX_MARKETPLACE_NAME: "sendbird",
+    });
 
-    const installDir = path.join(homeDir, ".codex", "plugins", "cc");
-    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "local-plugins", "cc", "local");
+    const cacheDir = path.join(homeDir, ".codex", "plugins", "cache", "sendbird", "cc", "local");
     const configFile = path.join(homeDir, ".codex", "config.toml");
-    const marketplaceFile = path.join(homeDir, ".agents", "plugins", "marketplace.json");
-    assert.ok(fs.existsSync(path.join(installDir, "scripts", "installer-cli.mjs")));
     assert.ok(fs.existsSync(path.join(cacheDir, "skills", "review", "SKILL.md")));
     assert.ok(fs.existsSync(configFile));
-    assert.ok(fs.existsSync(marketplaceFile));
 
     runShellWrapper("uninstall.sh", homeDir, sourceRoot, fakeCodex.env);
 
     const config = fs.readFileSync(configFile, "utf8");
-    assert.ok(!fs.existsSync(installDir), "shell uninstall should remove the installed plugin copy");
-    assert.ok(!fs.existsSync(cacheDir), "shell uninstall should remove the warmed local plugin cache");
-    assert.doesNotMatch(config, /\[plugins\."cc@local-plugins"\]/);
-    if (fs.existsSync(marketplaceFile)) {
-      const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, "utf8"));
-      assert.equal(
-        marketplace.plugins.filter((plugin) => plugin.name === "cc").length,
-        0,
-        "shell uninstall should remove the marketplace registration"
-      );
-    }
+    assert.ok(!fs.existsSync(cacheDir), "shell uninstall should remove the cached plugin copy");
+    assert.doesNotMatch(config, /\[plugins\."cc@sendbird"\]/);
   });
 });

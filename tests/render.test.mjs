@@ -165,6 +165,14 @@ describe("renderSetupReport", () => {
     assert.ok(output.includes("- hooks: Codex hooks installed"));
   });
 
+  it("includes hook trust details when present", () => {
+    const output = renderSetupReport({
+      ...baseReport,
+      hookTrust: { detail: "trusted 3 native plugin hooks" },
+    });
+    assert.ok(output.includes("- hook trust: trusted 3 native plugin hooks"));
+  });
+
   it("shows review gate status", () => {
     const enabled = renderSetupReport({ ...baseReport, reviewGateEnabled: true });
     assert.ok(enabled.includes("review gate: enabled"));

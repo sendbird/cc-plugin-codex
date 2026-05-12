@@ -60,6 +60,11 @@ import {
   resolveReviewTarget
 } from "./lib/git.mjs";
 import { binaryAvailable, getProcessIdentity } from "./lib/process.mjs";
+import { callCodexAppServer } from "./lib/codex-app-server.mjs";
+import {
+  ensureNativePluginHooksEnabled,
+  nativePluginHooksStatus,
+} from "./lib/codex-config.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
 import { parseStructuredOutput } from "./lib/structured-output.mjs";
 import {
@@ -334,20 +339,200 @@ function readOutputSchema(schemaPath) {
 // Readiness checks
 // ---------------------------------------------------------------------------
 
+function readCodexConfig() {
+  if (!fs.existsSync(CODEX_CONFIG_TOML)) {
+    return "";
+  }
+  return fs.readFileSync(CODEX_CONFIG_TOML, "utf8");
+}
+
+function writeCodexConfig(content) {
+  fs.mkdirSync(path.dirname(CODEX_CONFIG_TOML), { recursive: true });
+  fs.writeFileSync(CODEX_CONFIG_TOML, content, "utf8");
+}
+
+function configureNativePluginHooks() {
+  const existing = readCodexConfig();
+  const { changed, content } = ensureNativePluginHooksEnabled(existing);
+  if (changed || !fs.existsSync(CODEX_CONFIG_TOML)) {
+    writeCodexConfig(content);
+  }
+  return changed;
+}
+
+function currentPluginCacheInstallInfo() {
+  const cacheRoot = path.join(CODEX_DIR, "plugins", "cache");
+  const relativePath = path.relative(cacheRoot, ROOT_DIR);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    return null;
+  }
+  const [marketplaceName, pluginName, version] = relativePath
+    .split(path.sep)
+    .filter(Boolean);
+  if (!marketplaceName || pluginName !== "cc" || !version) {
+    return null;
+  }
+  return {
+    marketplaceName,
+    pluginName,
+    version,
+    pluginId: `${pluginName}@${marketplaceName}`,
+  };
+}
+
+function shouldRepairPluginHookTrust() {
+  return (
+    Boolean(currentPluginCacheInstallInfo()) ||
+    process.env.CC_PLUGIN_CODEX_FORCE_HOOK_TRUST === "1"
+  );
+}
+
+function pathIsInsideRoot(filePath) {
+  if (typeof filePath !== "string" || !filePath) {
+    return false;
+  }
+  const relativePath = path.relative(ROOT_DIR, path.resolve(filePath));
+  return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+}
+
+function isCurrentPluginHook(hook, pluginInfo) {
+  if (!hook || typeof hook !== "object") {
+    return false;
+  }
+  if (String(hook.source || "").toLowerCase() !== "plugin") {
+    return false;
+  }
+  if (pluginInfo?.pluginId && hook.pluginId !== pluginInfo.pluginId) {
+    return false;
+  }
+  if (pluginInfo == null && typeof hook.pluginId === "string" && !hook.pluginId.startsWith("cc@")) {
+    return false;
+  }
+  return pathIsInsideRoot(hook.sourcePath);
+}
+
+function hookNeedsTrust(hook) {
+  const trustStatus = String(hook?.trustStatus || "").toLowerCase();
+  return trustStatus === "untrusted" || trustStatus === "modified";
+}
+
+async function repairNativePluginHookTrust(cwd) {
+  const pluginInfo = currentPluginCacheInstallInfo();
+  if (!shouldRepairPluginHookTrust()) {
+    return {
+      attempted: false,
+      ready: true,
+      detail: "not running from an installed Codex plugin cache",
+    };
+  }
+
+  let response;
+  try {
+    response = await callCodexAppServer({
+      cwd,
+      method: "hooks/list",
+      params: { cwds: [cwd] },
+    });
+  } catch (error) {
+    return {
+      attempted: true,
+      ready: false,
+      detail: `unable to inspect native plugin hooks: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  const entries = Array.isArray(response?.data) ? response.data : [];
+  const hooks = entries.flatMap((entry) => (Array.isArray(entry?.hooks) ? entry.hooks : []));
+  const pluginHooks = hooks.filter((hook) => isCurrentPluginHook(hook, pluginInfo));
+  const untrustedHooks = pluginHooks.filter(
+    (hook) => hookNeedsTrust(hook) && typeof hook.key === "string" && hook.currentHash
+  );
+
+  if (pluginHooks.length === 0) {
+    return {
+      attempted: true,
+      ready: false,
+      found: 0,
+      trusted: 0,
+      detail: "no native plugin hooks were reported for this plugin",
+    };
+  }
+  if (untrustedHooks.length === 0) {
+    return {
+      attempted: true,
+      ready: true,
+      found: pluginHooks.length,
+      trusted: 0,
+      detail: `native plugin hooks already trusted (${pluginHooks.length})`,
+    };
+  }
+
+  const value = Object.fromEntries(
+    untrustedHooks.map((hook) => [
+      hook.key,
+      {
+        trusted_hash: hook.currentHash,
+      },
+    ])
+  );
+
+  try {
+    await callCodexAppServer({
+      cwd,
+      method: "config/batchWrite",
+      params: {
+        edits: [
+          {
+            keyPath: "hooks.state",
+            value,
+            mergeStrategy: "upsert",
+          },
+        ],
+        filePath: null,
+        expectedVersion: null,
+        reloadUserConfig: true,
+      },
+    });
+  } catch (error) {
+    return {
+      attempted: true,
+      ready: false,
+      found: pluginHooks.length,
+      trusted: 0,
+      detail: `unable to trust native plugin hooks: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  return {
+    attempted: true,
+    ready: true,
+    found: pluginHooks.length,
+    trusted: untrustedHooks.length,
+    detail: `trusted ${untrustedHooks.length} native plugin hooks`,
+  };
+}
+
 function checkHooksStatus() {
-  const hooksFile = path.join(CODEX_DIR, "hooks.json");
-  if (!fs.existsSync(hooksFile)) {
-    return { installed: false, detail: "hooks.json not found — run install-hooks.mjs" };
+  const bundledHooksFile = path.join(ROOT_DIR, "hooks", "hooks.json");
+  if (!fs.existsSync(bundledHooksFile)) {
+    return {
+      installed: false,
+      detail: `plugin-bundled hooks file missing at ${bundledHooksFile}`,
+    };
   }
-  const content = fs.readFileSync(hooksFile, "utf8");
-  if (
-    content.includes("session-lifecycle-hook.mjs") &&
-    content.includes("stop-review-gate-hook.mjs") &&
-    content.includes("unread-result-hook.mjs")
-  ) {
-    return { installed: true, detail: "Codex hooks installed" };
+
+  const status = nativePluginHooksStatus(readCodexConfig());
+  if (status.installed) {
+    return { installed: true, detail: "native Codex plugin hooks enabled" };
   }
-  return { installed: false, detail: "hooks.json exists but Codex hooks not found — run install-hooks.mjs" };
+  return {
+    installed: false,
+    detail: `native Codex plugin hooks disabled: missing ${status.missing.join(", ")}`,
+  };
 }
 
 function ensureClaudeReady(cwd) {
@@ -364,7 +549,7 @@ function ensureClaudeReady(cwd) {
   }
 }
 
-function buildSetupReport(cwd, actionsTaken = []) {
+function buildSetupReport(cwd, actionsTaken = [], hookTrust = null) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const claudeStatus = getClaudeAvailability(cwd);
@@ -380,7 +565,10 @@ function buildSetupReport(cwd, actionsTaken = []) {
     nextSteps.push("Run `claude auth login`.");
   }
   if (!hooksStatus.installed) {
-    nextSteps.push("Run `node scripts/install-hooks.mjs` to install Codex hooks.");
+    nextSteps.push("Run `$cc:setup` again after enabling native Codex plugin hooks.");
+  }
+  if (hookTrust?.ready === false) {
+    nextSteps.push("Open `/hooks` and trust this plugin's hooks manually, then rerun `$cc:setup`.");
   }
   if (!config.stopReviewGate) {
     nextSteps.push(
@@ -393,11 +581,13 @@ function buildSetupReport(cwd, actionsTaken = []) {
       nodeStatus.available &&
       claudeStatus.available &&
       authStatus.loggedIn &&
-      hooksStatus.installed,
+      hooksStatus.installed &&
+      hookTrust?.ready !== false,
     node: nodeStatus,
     claude: claudeStatus,
     auth: authStatus,
     hooks: hooksStatus,
+    hookTrust,
     reviewGateEnabled: Boolean(config.stopReviewGate),
     actionsTaken,
     nextSteps
@@ -408,7 +598,7 @@ function buildSetupReport(cwd, actionsTaken = []) {
 // setup
 // ---------------------------------------------------------------------------
 
-function handleSetup(argv) {
+async function handleSetup(argv) {
   const { options } = parseCommandInput(argv, {
     valueOptions: ["cwd"],
     booleanOptions: ["json", "enable-review-gate", "disable-review-gate"]
@@ -422,6 +612,18 @@ function handleSetup(argv) {
   const workspaceRoot = resolveCommandWorkspace(options);
   const actionsTaken = [];
 
+  if (configureNativePluginHooks()) {
+    actionsTaken.push(
+      "Enabled native Codex plugin hooks via [features].hooks and [features].plugin_hooks."
+    );
+    actionsTaken.push("Restart Codex if this session started before the feature change.");
+  }
+
+  const hookTrust = await repairNativePluginHookTrust(cwd);
+  if (hookTrust.trusted > 0) {
+    actionsTaken.push(`Trusted ${hookTrust.trusted} native Codex plugin hooks.`);
+  }
+
   if (options["enable-review-gate"]) {
     setConfig(workspaceRoot, "stopReviewGate", true);
     actionsTaken.push(`Enabled the stop-time review gate for ${workspaceRoot}.`);
@@ -430,7 +632,7 @@ function handleSetup(argv) {
     actionsTaken.push(`Disabled the stop-time review gate for ${workspaceRoot}.`);
   }
 
-  const finalReport = buildSetupReport(cwd, actionsTaken);
+  const finalReport = buildSetupReport(cwd, actionsTaken, hookTrust);
   outputResult(
     options.json ? finalReport : renderSetupReport(finalReport),
     options.json
@@ -1832,7 +2034,7 @@ async function main() {
 
   switch (subcommand) {
     case "setup":
-      handleSetup(argv);
+      await handleSetup(argv);
       break;
     case "review":
       await handleReview(argv);

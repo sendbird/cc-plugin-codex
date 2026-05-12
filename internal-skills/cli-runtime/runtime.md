@@ -2,10 +2,10 @@
 
 Use this document only inside the rescue forwarding worker spawned by `$cc:rescue` as defined in `../../skills/rescue/SKILL.md`.
 This is an internal execution contract, not a public skill. It owns execution and routing. It does not own prompt rewriting beyond deciding when to consult the prompt-shaping reference.
-The public rescue skill already resolved the installed plugin root. Reuse that installed copy path here. Do not derive a new runtime path from this document, any cache directory, or the current working tree.
+The public rescue skill already resolved the active plugin root from its `SKILL.md` path. Reuse that path here. Do not derive a new runtime path from this document or the current working tree.
 
 Primary helper:
-- `node "<installed-plugin-root>/scripts/claude-companion.mjs" task ...`
+- `node "<plugin-root>/scripts/claude-companion.mjs" task ...`
 
 Execution rules:
 - The rescue subagent is a forwarder, not an operator. Launch exactly one `task` command and return that stdout unchanged.
