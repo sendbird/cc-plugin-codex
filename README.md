@@ -47,6 +47,7 @@ Install from the Sendbird marketplace:
 
 ```bash
 codex plugin marketplace add sendbird/codex-marketplace
+codex plugin add cc@sendbird
 ```
 
 Then install `cc` from the Sendbird marketplace inside Codex, and run `$cc:setup` once.
