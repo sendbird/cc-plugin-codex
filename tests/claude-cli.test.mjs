@@ -478,22 +478,11 @@ describe("resolveDefaultModel", () => {
 });
 
 describe("resolveDefaultEffort", () => {
-  it("defaults to xhigh for the opus alias", () => {
-    assert.equal(resolveDefaultEffort("opus", null), "xhigh");
-    assert.equal(resolveDefaultEffort("OPUS", undefined), "xhigh");
-  });
-
-  it("defaults to high for the sonnet alias", () => {
-    assert.equal(resolveDefaultEffort("sonnet", null), "high");
-  });
-
-  it("defaults to high for the native fable alias", () => {
-    assert.equal(resolveDefaultEffort("fable", null), "high");
-    assert.equal(resolveDefaultEffort("FABLE", undefined), "high");
-  });
-
-  it("returns undefined for haiku (no effort default)", () => {
-    assert.equal(resolveDefaultEffort("haiku", null), undefined);
+  it("defaults to high for every friendly model alias", () => {
+    for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
+      assert.equal(resolveDefaultEffort(alias, null), "high");
+      assert.equal(resolveDefaultEffort(alias.toUpperCase(), undefined), "high");
+    }
   });
 
   it("does not infer effort for full or provider-specific model names", () => {
@@ -511,16 +500,15 @@ describe("resolveDefaultEffort", () => {
   });
 
   it("treats blank effort as missing", () => {
-    assert.equal(resolveDefaultEffort("opus", ""), "xhigh");
-    assert.equal(resolveDefaultEffort("opus", "   "), "xhigh");
+    assert.equal(resolveDefaultEffort("opus", ""), "high");
+    assert.equal(resolveDefaultEffort("opus", "   "), "high");
   });
 
   it("DEFAULT_EFFORT_BY_MODEL contains the expected entries", () => {
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("opus"), "xhigh");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("sonnet"), "high");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("fable"), "high");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.has("haiku"), false);
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.size, 3);
+    for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
+      assert.equal(DEFAULT_EFFORT_BY_MODEL.get(alias), "high");
+    }
+    assert.equal(DEFAULT_EFFORT_BY_MODEL.size, 4);
   });
 });
 

@@ -647,9 +647,10 @@ export const VALID_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 export const DEFAULT_MODEL = "opus";
 
 export const DEFAULT_EFFORT_BY_MODEL = new Map([
-  ["opus", "xhigh"],
-  ["sonnet", "high"],
   ["fable", "high"],
+  ["opus", "high"],
+  ["sonnet", "high"],
+  ["haiku", "high"],
 ]);
 
 export function resolveDefaultModel(model) {

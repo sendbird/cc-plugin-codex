@@ -1,6 +1,6 @@
 ---
 name: rescue
-description: 'Delegate a substantial diagnosis, implementation, or follow-up task to Claude Code through the tracked-job runtime. Args: --background, --wait, --resume, --resume-last, --fresh, --write, --model <model>, --effort <low|medium|high|xhigh|max>, --prompt-file <path>, [task text]. Defaults to opus + xhigh effort. Use when Claude should investigate or change things, not when the user only wants review findings.'
+description: 'Delegate a substantial diagnosis, implementation, or follow-up task to Claude Code through the tracked-job runtime. Args: --background, --wait, --resume, --resume-last, --fresh, --write, --model <model>, --effort <low|medium|high|xhigh|max>, --prompt-file <path>, [task text]. Defaults to opus + high effort. Use when Claude should investigate or change things, not when the user only wants review findings.'
 ---
 
 # Claude Code Rescue
@@ -24,7 +24,7 @@ Raw slash-command arguments:
 
 Supported arguments: `--background`, `--wait`, `--resume`, `--resume-last`, `--fresh`, `--write`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`, `--prompt-file <path>`, plus free-text task text
 
-Companion defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort.
+Companion defaults: model=opus; fable, opus, sonnet, and haiku each default to high effort.
 
 Forward `--model` unchanged. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
 

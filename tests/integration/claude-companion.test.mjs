@@ -954,6 +954,39 @@ describe("claude-companion integration", () => {
     }
   });
 
+  it("defaults every friendly model alias to high effort", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
+        const argsFile = path.join(testEnv.rootDir, `${alias}-default-effort-args.json`);
+        runCompanion(
+          [
+            "task",
+            "--cwd",
+            testEnv.workspaceDir,
+            "--model",
+            alias,
+            "--quiet-progress",
+            `${alias} default effort delay=20`,
+          ],
+          {
+            env: {
+              ...testEnv.env,
+              CLAUDE_ARGS_FILE: argsFile,
+            },
+          }
+        );
+
+        const args = JSON.parse(fs.readFileSync(argsFile, "utf8"));
+        assert.equal(args[args.indexOf("--model") + 1], alias);
+        assert.equal(args[args.indexOf("--effort") + 1], "high");
+      }
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
   it("passes native Fable with high default effort through task and review flows", () => {
     const testEnv = createTestEnvironment();
 

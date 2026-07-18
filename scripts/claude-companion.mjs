@@ -12,7 +12,7 @@
  * - Uses claude-cli.mjs instead of app-server/broker
  * - Model aliases and full IDs pass through to Claude Code for resolution
  * - Default model when --model is unset: opus
- * - Default effort by model: opus -> xhigh, sonnet|fable -> high, haiku -> unset
+ * - Default effort for friendly model aliases: high
  * - Claude CLI effort values: low, medium, high, xhigh, max
  * - Legacy effort aliases: none|minimal -> low
  * - Review gate matches upstream setup semantics: Stop hook runs when enabled

@@ -1,6 +1,6 @@
 ---
 name: review
-description: 'Run a standard Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>, --effort <low|medium|high|xhigh|max>. Defaults to opus + xhigh effort. Use as the default path for ordinary code-review requests when the user did not explicitly ask for stronger adversarial scrutiny or for Claude to own the implementation work.'
+description: 'Run a standard Claude Code review of local git changes in this repository. Args: --wait, --background, --base <ref>, --scope <auto|working-tree|branch>, --model <model>, --effort <low|medium|high|xhigh|max>. Defaults to opus + high effort. Use as the default path for ordinary code-review requests when the user did not explicitly ask for stronger adversarial scrutiny or for Claude to own the implementation work.'
 ---
 
 # Claude Code Review
@@ -16,7 +16,7 @@ If the overall request is "you review it too, also ask Claude to review in the b
 Resolve `<plugin-root>` as two directories above this `SKILL.md` file. Always run the companion from that active plugin root:
 `node "<plugin-root>/scripts/claude-companion.mjs" review ...`
 
-Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>` (defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort)
+Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>` (defaults: model=opus; fable, opus, sonnet, and haiku each default to high effort)
 
 Forward `--model` unchanged. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
 
