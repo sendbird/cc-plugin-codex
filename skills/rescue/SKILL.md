@@ -26,6 +26,8 @@ Supported arguments: `--background`, `--wait`, `--resume`, `--resume-last`, `--f
 
 Companion defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort.
 
+Forward `--model` unchanged. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
+
 Main-thread routing rules:
 - If the user explicitly invoked `$cc:rescue` or `Claude Code Rescue`, do not keep the work in the main Codex thread. Delegate it.
 - If the user did not supply a task, ask what Claude Code should investigate or fix.

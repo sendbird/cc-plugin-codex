@@ -1708,7 +1708,7 @@ describe("Codex direct-skill E2E", () => {
       const claudeInvocations = readClaudeInvocations(testEnv.claudeLogFile);
       assert.ok(
         claudeInvocations.some(
-          (entry) => entry.args.includes("--model") && entry.args.includes("claude-haiku-4-5")
+          (entry) => entry.args.includes("--model") && entry.args.includes("haiku")
         ),
         "installed plugin review should forward the requested model alias to Claude without running setup first"
       );
@@ -1759,7 +1759,7 @@ describe("Codex direct-skill E2E", () => {
       assert.match(finalMessage, /Claude Code Review/);
       const claudeInvocations = readClaudeInvocations(testEnv.claudeLogFile);
       assert.ok(
-        claudeInvocations.some((entry) => entry.args.includes("--model") && entry.args.includes("claude-haiku-4-5")),
+        claudeInvocations.some((entry) => entry.args.includes("--model") && entry.args.includes("haiku")),
         "review e2e should forward the requested model alias to Claude"
       );
     } finally {

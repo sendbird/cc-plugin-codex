@@ -10,7 +10,7 @@
  *
  * Adapted from codex-companion.mjs:
  * - Uses claude-cli.mjs instead of app-server/broker
- * - MODEL_ALIASES: opus -> claude-opus-4-7[1m], sonnet -> claude-sonnet-4-6[1m], haiku -> claude-haiku-4-5
+ * - Model aliases and full IDs pass through to Claude Code for resolution
  * - Default model when --model is unset: opus
  * - Default effort by model: opus -> xhigh, sonnet|fable -> high, haiku -> unset
  * - Claude CLI effort values: low, medium, high, xhigh, max
@@ -42,7 +42,7 @@ import {
   runClaudeReview,
   runClaudeAdversarialReview,
   cancelClaudeProcess,
-  MODEL_ALIASES,
+  resolveModel,
   resolveEffort,
   resolveDefaultModel,
   resolveDefaultEffort,
@@ -137,9 +137,9 @@ function printUsage() {
     [
       "Usage:",
       "  node scripts/claude-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
-      "  node scripts/claude-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>]",
-      "  node scripts/claude-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [focus text]",
-      "  node scripts/claude-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [prompt]",
+      "  node scripts/claude-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model>] [--effort <low|medium|high|xhigh|max>]",
+      "  node scripts/claude-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model>] [--effort <low|medium|high|xhigh|max>] [focus text]",
+      "  node scripts/claude-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model>] [--effort <low|medium|high|xhigh|max>] [prompt]",
       "  node scripts/claude-companion.mjs status [job-id] [--all] [--json]",
       "  node scripts/claude-companion.mjs result [job-id] [--json]",
       "  node scripts/claude-companion.mjs cancel [job-id] [--json]",
@@ -178,17 +178,6 @@ function redactOutputReplacer(key, value) {
 // ---------------------------------------------------------------------------
 // Normalization
 // ---------------------------------------------------------------------------
-
-function normalizeRequestedModel(model) {
-  if (model == null) {
-    return null;
-  }
-  const normalized = String(model).trim();
-  if (!normalized) {
-    return null;
-  }
-  return MODEL_ALIASES.get(normalized.toLowerCase()) ?? normalized;
-}
 
 function resolveReservedJobFile(workspaceRoot, jobId) {
   const safeJobId = sanitizeId(jobId, "job ID");
@@ -1521,7 +1510,7 @@ async function handleReviewCommand(argv, config) {
     Boolean(options.background)
   );
 
-  const requestedModel = normalizeRequestedModel(options.model);
+  const requestedModel = resolveModel(options.model);
   const resolvedModel = resolveDefaultModel(requestedModel);
   const resolvedEffort = resolveDefaultEffort(resolvedModel, options.effort);
 
@@ -1622,7 +1611,7 @@ async function handleTask(argv) {
   const cwd = resolveCommandCwd(options);
   const workspaceRoot = resolveCommandWorkspace(options);
 
-  const requestedModel = normalizeRequestedModel(options.model);
+  const requestedModel = resolveModel(options.model);
   const model = resolveDefaultModel(requestedModel);
   const resolvedEffort = resolveDefaultEffort(model, options.effort);
   const effort = resolvedEffort ? resolveEffort(resolvedEffort) : null;

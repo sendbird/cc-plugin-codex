@@ -942,7 +942,7 @@ describe("claude-companion integration", () => {
       const args = JSON.parse(fs.readFileSync(argsFile, "utf8"));
       assert.equal(args[0], "-p");
       assert.ok(args.includes("--model"));
-      assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-4-5");
+      assert.equal(args[args.indexOf("--model") + 1], "haiku");
       assert.ok(args.includes("--effort"));
       assert.equal(args[args.indexOf("--effort") + 1], "high");
       assert.ok(args.includes("--permission-mode"));
@@ -1117,7 +1117,7 @@ describe("claude-companion integration", () => {
       );
       assert.equal(
         reviewInvocation.args[reviewInvocation.args.indexOf("--model") + 1],
-        "claude-haiku-4-5"
+        "haiku"
       );
       assert.match(reviewInvocation.prompt, /working tree diff/i);
       assert.match(reviewResult.stdout, /Claude Code Review/);
@@ -1211,7 +1211,7 @@ describe("claude-companion integration", () => {
       const invocation = JSON.parse(fs.readFileSync(invocationFile, "utf8"));
       assert.equal(
         invocation.args[invocation.args.indexOf("--model") + 1],
-        "claude-haiku-4-5"
+        "haiku"
       );
       assert.match(invocation.prompt, /focus on command injection/i);
       assert.match(result.stdout, /Adversarial Review/);

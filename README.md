@@ -128,7 +128,9 @@ $cc:review --model opus --effort high   # opus with a lighter effort
 
 **Flags:** `--base <ref>`, `--scope <auto|working-tree|branch>`, `--wait`, `--background`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`
 
-**Defaults:** model `opus` (resolves to `claude-opus-4-7[1m]`, the 1M-context variant) with `xhigh` effort. If you pick `sonnet`, it resolves to `claude-sonnet-4-6[1m]` (also 1M context) and the default effort drops to `high`. `fable` passes through to Claude Code and also defaults to `high`. `haiku` resolves to `claude-haiku-4-5` and has no effort setting. Pass `--model` and `--effort` to override.
+**Defaults:** model `opus` with `xhigh` effort. Friendly aliases such as `fable`, `opus`, `sonnet`, and `haiku` pass directly to Claude Code, which resolves them for your account and provider. `sonnet` and `fable` default to `high`; `haiku` has no effort setting. Full model IDs and provider-specific names also pass through unchanged and receive no inferred effort. Pass `--model` and `--effort` to override.
+
+**Model discovery:** run `/model` in Claude Code to see the models and effort levels available to your current account and provider, then pass the selected alias or full ID to this plugin. The plugin intentionally does not maintain a static model catalog or force `[1m]`; Claude Code owns alias versions, managed restrictions, provider routing, and extended-context eligibility.
 
 Scope `auto` (the default) inspects `git status` and chooses between working-tree and branch automatically.
 
@@ -172,7 +174,7 @@ $cc:rescue --model sonnet --effort medium investigate the flaky test
 | `--resume-last` | Alias for `--resume` |
 | `--fresh` | Force a new task (don't resume) |
 | `--write` | Allow file edits (default) |
-| `--model <model>` | Claude model (`fable`, `opus`, `sonnet`, `haiku`, or full ID; defaults to `opus`. `fable` passes through to Claude Code. The `opus` and `sonnet` aliases resolve to their 1M-context variants `claude-opus-4-7[1m]` and `claude-sonnet-4-6[1m]`.) |
+| `--model <model>` | Any Claude Code model alias, full model ID, or provider-specific name; defaults to `opus`. Run `/model` in Claude Code to discover options available to your account and provider. |
 | `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh`, `max` (default: `xhigh` for opus, `high` for sonnet and fable, unset for haiku) |
 | `--prompt-file <path>` | Read task description from a file |
 

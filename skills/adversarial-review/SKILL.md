@@ -18,6 +18,8 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md` file. Always ru
 
 Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`, plus optional focus text after the flags (defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort)
 
+Forward `--model` unchanged. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
+
 Raw slash-command arguments:
 `$ARGUMENTS`
 

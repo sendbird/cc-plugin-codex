@@ -14,7 +14,6 @@ import {
   resolveDefaultEffort,
   resolveClaudeBin,
   buildArgs,
-  MODEL_ALIASES,
   EFFORT_ALIASES,
   VALID_EFFORTS,
   DEFAULT_MODEL,
@@ -428,20 +427,15 @@ describe("validateTurnCompletion", () => {
 // ===========================================================================
 
 describe("resolveModel", () => {
-  it("maps 'sonnet' to the 1M variant 'claude-sonnet-4-6[1m]'", () => {
-    assert.equal(resolveModel("sonnet"), "claude-sonnet-4-6[1m]");
+  it("passes Claude Code model aliases through unchanged", () => {
+    for (const alias of ["fable", "opus", "sonnet", "haiku", "default", "opusplan"]) {
+      assert.equal(resolveModel(alias), alias);
+    }
   });
 
-  it("maps 'haiku' to 'claude-haiku-4-5'", () => {
-    assert.equal(resolveModel("haiku"), "claude-haiku-4-5");
-  });
-
-  it("passes through unknown model names", () => {
-    assert.equal(resolveModel("claude-3-opus-20240229"), "claude-3-opus-20240229");
-  });
-
-  it("passes the native 'fable' alias through unchanged", () => {
-    assert.equal(resolveModel("fable"), "fable");
+  it("passes full and provider-specific model names through unchanged", () => {
+    assert.equal(resolveModel("claude-fable-5"), "claude-fable-5");
+    assert.equal(resolveModel("us.anthropic.claude-opus-custom"), "us.anthropic.claude-opus-custom");
   });
 
   it("returns undefined for null/undefined input", () => {
@@ -449,20 +443,13 @@ describe("resolveModel", () => {
     assert.equal(resolveModel(undefined), undefined);
   });
 
-  it("passes through empty string", () => {
+  it("returns undefined for blank input", () => {
     assert.equal(resolveModel(""), undefined);
+    assert.equal(resolveModel("   "), undefined);
   });
 
-  it("maps 'opus' to the 1M variant 'claude-opus-4-7[1m]'", () => {
-    assert.equal(resolveModel("opus"), "claude-opus-4-7[1m]");
-  });
-
-  it("MODEL_ALIASES map has expected entries", () => {
-    assert.equal(MODEL_ALIASES.size, 3);
-    assert.ok(MODEL_ALIASES.has("opus"));
-    assert.ok(MODEL_ALIASES.has("sonnet"));
-    assert.ok(MODEL_ALIASES.has("haiku"));
-    assert.equal(MODEL_ALIASES.has("fable"), false);
+  it("trims surrounding whitespace without rewriting the model", () => {
+    assert.equal(resolveModel("  claude-fable-5  "), "claude-fable-5");
   });
 });
 
@@ -491,17 +478,13 @@ describe("resolveDefaultModel", () => {
 });
 
 describe("resolveDefaultEffort", () => {
-  it("defaults to xhigh for opus alias and resolved id (including 1M variant)", () => {
+  it("defaults to xhigh for the opus alias", () => {
     assert.equal(resolveDefaultEffort("opus", null), "xhigh");
-    assert.equal(resolveDefaultEffort("claude-opus-4-7", null), "xhigh");
-    assert.equal(resolveDefaultEffort("claude-opus-4-7[1m]", null), "xhigh");
     assert.equal(resolveDefaultEffort("OPUS", undefined), "xhigh");
   });
 
-  it("defaults to high for sonnet alias and resolved id (including 1M variant)", () => {
+  it("defaults to high for the sonnet alias", () => {
     assert.equal(resolveDefaultEffort("sonnet", null), "high");
-    assert.equal(resolveDefaultEffort("claude-sonnet-4-6", null), "high");
-    assert.equal(resolveDefaultEffort("claude-sonnet-4-6[1m]", null), "high");
   });
 
   it("defaults to high for the native fable alias", () => {
@@ -511,10 +494,12 @@ describe("resolveDefaultEffort", () => {
 
   it("returns undefined for haiku (no effort default)", () => {
     assert.equal(resolveDefaultEffort("haiku", null), undefined);
-    assert.equal(resolveDefaultEffort("claude-haiku-4-5", undefined), undefined);
   });
 
-  it("returns undefined for unknown model when effort not provided", () => {
+  it("does not infer effort for full or provider-specific model names", () => {
+    assert.equal(resolveDefaultEffort("claude-opus-4-7[1m]", null), undefined);
+    assert.equal(resolveDefaultEffort("claude-sonnet-4-6", null), undefined);
+    assert.equal(resolveDefaultEffort("us.anthropic.claude-opus-custom", null), undefined);
     assert.equal(resolveDefaultEffort("some-future-model", null), undefined);
   });
 
@@ -532,13 +517,10 @@ describe("resolveDefaultEffort", () => {
 
   it("DEFAULT_EFFORT_BY_MODEL contains the expected entries", () => {
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("opus"), "xhigh");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-opus-4-7"), "xhigh");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-opus-4-7[1m]"), "xhigh");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("sonnet"), "high");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-sonnet-4-6"), "high");
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-sonnet-4-6[1m]"), "high");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("fable"), "high");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.has("haiku"), false);
+    assert.equal(DEFAULT_EFFORT_BY_MODEL.size, 3);
   });
 });
 
@@ -740,11 +722,11 @@ describe("buildArgs", () => {
     assert.ok(!args.includes("--no-session-persistence"));
   });
 
-  it("includes --model with resolved model alias", () => {
+  it("includes the model alias unchanged", () => {
     const args = buildArgs("p", { model: "sonnet" });
     const idx = args.indexOf("--model");
     assert.ok(idx >= 0);
-    assert.equal(args[idx + 1], "claude-sonnet-4-6[1m]");
+    assert.equal(args[idx + 1], "sonnet");
   });
 
   it("includes the native fable alias unchanged", () => {

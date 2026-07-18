@@ -634,14 +634,8 @@ export function pruneStaleReviewMcpConfigs(options = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Model & Effort Mapping
+// Model & Effort Selection
 // ---------------------------------------------------------------------------
-
-export const MODEL_ALIASES = new Map([
-  ["opus", "claude-opus-4-7[1m]"],
-  ["sonnet", "claude-sonnet-4-6[1m]"],
-  ["haiku", "claude-haiku-4-5"],
-]);
 
 export const EFFORT_ALIASES = {
   none: "low",
@@ -654,11 +648,7 @@ export const DEFAULT_MODEL = "opus";
 
 export const DEFAULT_EFFORT_BY_MODEL = new Map([
   ["opus", "xhigh"],
-  ["claude-opus-4-7", "xhigh"],
-  ["claude-opus-4-7[1m]", "xhigh"],
   ["sonnet", "high"],
-  ["claude-sonnet-4-6", "high"],
-  ["claude-sonnet-4-6[1m]", "high"],
   ["fable", "high"],
 ]);
 
@@ -678,8 +668,9 @@ export function resolveDefaultEffort(model, effort) {
 }
 
 export function resolveModel(model) {
-  if (!model) return undefined;
-  return MODEL_ALIASES.get(model) ?? model;
+  if (model == null) return undefined;
+  const normalized = String(model).trim();
+  return normalized || undefined;
 }
 
 export function resolveEffort(effort) {

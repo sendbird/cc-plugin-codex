@@ -32,6 +32,29 @@ test("public model contracts document native Fable support", () => {
   }
 });
 
+test("model contracts delegate discovery and alias resolution to Claude Code", () => {
+  const contracts = [
+    "README.md",
+    "skills/review/SKILL.md",
+    "skills/adversarial-review/SKILL.md",
+    "skills/rescue/SKILL.md",
+    "internal-skills/cli-runtime/runtime.md",
+  ];
+
+  for (const contractPath of contracts) {
+    const contract = read(contractPath);
+    assert.match(contract, /\/model/i, `${contractPath} must point to Claude Code model discovery`);
+  }
+
+  const implementation = [
+    read("scripts/claude-companion.mjs"),
+    read("scripts/lib/claude-cli.mjs"),
+  ].join("\n");
+  assert.doesNotMatch(implementation, /MODEL_ALIASES/);
+  assert.doesNotMatch(implementation, /claude-(?:opus|sonnet|haiku)-\d/);
+  assert.doesNotMatch(implementation, /\[1m\]/);
+});
+
 test("built-in child commands preserve the workspace for reserved job ids", () => {
   const skills = [
     ["rescue", "skills/rescue/SKILL.md"],
