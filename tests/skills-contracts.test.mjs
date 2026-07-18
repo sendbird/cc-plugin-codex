@@ -16,6 +16,22 @@ function read(relativePath) {
   return fs.readFileSync(path.join(PROJECT_ROOT, relativePath), "utf8");
 }
 
+test("public model contracts document native Fable support", () => {
+  const contracts = [
+    "README.md",
+    "skills/review/SKILL.md",
+    "skills/adversarial-review/SKILL.md",
+    "skills/rescue/SKILL.md",
+    "internal-skills/cli-runtime/runtime.md",
+  ];
+
+  for (const contractPath of contracts) {
+    const contract = read(contractPath);
+    assert.match(contract, /fable/i, `${contractPath} must document Fable`);
+    assert.match(contract, /fable[^\n]*high|high[^\n]*fable/i, `${contractPath} must document Fable's high default effort`);
+  }
+});
+
 test("built-in child commands preserve the workspace for reserved job ids", () => {
   const skills = [
     ["rescue", "skills/rescue/SKILL.md"],

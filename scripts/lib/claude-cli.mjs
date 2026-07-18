@@ -659,6 +659,7 @@ export const DEFAULT_EFFORT_BY_MODEL = new Map([
   ["sonnet", "high"],
   ["claude-sonnet-4-6", "high"],
   ["claude-sonnet-4-6[1m]", "high"],
+  ["fable", "high"],
 ]);
 
 export function resolveDefaultModel(model) {

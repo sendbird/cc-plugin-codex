@@ -16,7 +16,7 @@ Unlike `$cc:review`, this skill accepts custom focus text after the flags. The m
 Resolve `<plugin-root>` as two directories above this `SKILL.md` file. Always run the companion from that active plugin root:
 `node "<plugin-root>/scripts/claude-companion.mjs" adversarial-review ...`
 
-Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`, plus optional focus text after the flags (defaults: model=opus, effort=xhigh; sonnet defaults to high; haiku has no effort)
+Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`, plus optional focus text after the flags (defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort)
 
 Raw slash-command arguments:
 `$ARGUMENTS`

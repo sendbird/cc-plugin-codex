@@ -440,6 +440,10 @@ describe("resolveModel", () => {
     assert.equal(resolveModel("claude-3-opus-20240229"), "claude-3-opus-20240229");
   });
 
+  it("passes the native 'fable' alias through unchanged", () => {
+    assert.equal(resolveModel("fable"), "fable");
+  });
+
   it("returns undefined for null/undefined input", () => {
     assert.equal(resolveModel(null), undefined);
     assert.equal(resolveModel(undefined), undefined);
@@ -458,6 +462,7 @@ describe("resolveModel", () => {
     assert.ok(MODEL_ALIASES.has("opus"));
     assert.ok(MODEL_ALIASES.has("sonnet"));
     assert.ok(MODEL_ALIASES.has("haiku"));
+    assert.equal(MODEL_ALIASES.has("fable"), false);
   });
 });
 
@@ -475,6 +480,7 @@ describe("resolveDefaultModel", () => {
 
   it("passes through an explicit model", () => {
     assert.equal(resolveDefaultModel("sonnet"), "sonnet");
+    assert.equal(resolveDefaultModel("fable"), "fable");
     assert.equal(resolveDefaultModel("haiku"), "haiku");
     assert.equal(resolveDefaultModel("claude-opus-4-7"), "claude-opus-4-7");
   });
@@ -496,6 +502,11 @@ describe("resolveDefaultEffort", () => {
     assert.equal(resolveDefaultEffort("sonnet", null), "high");
     assert.equal(resolveDefaultEffort("claude-sonnet-4-6", null), "high");
     assert.equal(resolveDefaultEffort("claude-sonnet-4-6[1m]", null), "high");
+  });
+
+  it("defaults to high for the native fable alias", () => {
+    assert.equal(resolveDefaultEffort("fable", null), "high");
+    assert.equal(resolveDefaultEffort("FABLE", undefined), "high");
   });
 
   it("returns undefined for haiku (no effort default)", () => {
@@ -526,6 +537,7 @@ describe("resolveDefaultEffort", () => {
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("sonnet"), "high");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-sonnet-4-6"), "high");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.get("claude-sonnet-4-6[1m]"), "high");
+    assert.equal(DEFAULT_EFFORT_BY_MODEL.get("fable"), "high");
     assert.equal(DEFAULT_EFFORT_BY_MODEL.has("haiku"), false);
   });
 });
@@ -733,6 +745,13 @@ describe("buildArgs", () => {
     const idx = args.indexOf("--model");
     assert.ok(idx >= 0);
     assert.equal(args[idx + 1], "claude-sonnet-4-6[1m]");
+  });
+
+  it("includes the native fable alias unchanged", () => {
+    const args = buildArgs("p", { model: "fable" });
+    const idx = args.indexOf("--model");
+    assert.ok(idx >= 0);
+    assert.equal(args[idx + 1], "fable");
   });
 
   it("includes --effort with resolved effort", () => {

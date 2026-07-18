@@ -954,6 +954,69 @@ describe("claude-companion integration", () => {
     }
   });
 
+  it("passes native Fable with high default effort through task and review flows", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      const taskArgsFile = path.join(testEnv.rootDir, "fable-task-args.json");
+      runCompanion(
+        [
+          "task",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--model",
+          "fable",
+          "--quiet-progress",
+          "fable task delay=20",
+        ],
+        {
+          env: {
+            ...testEnv.env,
+            CLAUDE_ARGS_FILE: taskArgsFile,
+          },
+        }
+      );
+
+      const taskArgs = JSON.parse(fs.readFileSync(taskArgsFile, "utf8"));
+      assert.equal(taskArgs[taskArgs.indexOf("--model") + 1], "fable");
+      assert.equal(taskArgs[taskArgs.indexOf("--effort") + 1], "high");
+
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+
+      for (const [command, focusText] of [
+        ["review", []],
+        ["adversarial-review", ["focus on model routing"]],
+      ]) {
+        const invocationFile = path.join(testEnv.rootDir, `fable-${command}-invocation.json`);
+        runCompanion(
+          [
+            command,
+            "--cwd",
+            testEnv.workspaceDir,
+            "--scope",
+            "working-tree",
+            "--model",
+            "fable",
+            ...focusText,
+          ],
+          {
+            env: {
+              ...testEnv.env,
+              CLAUDE_INVOCATION_FILE: invocationFile,
+            },
+          }
+        );
+
+        const invocation = JSON.parse(fs.readFileSync(invocationFile, "utf8"));
+        assert.equal(invocation.args[invocation.args.indexOf("--model") + 1], "fable");
+        assert.equal(invocation.args[invocation.args.indexOf("--effort") + 1], "high");
+      }
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
   it("uses --resume to continue the latest session and keeps --fresh from injecting a resume id", async () => {
     const testEnv = createTestEnvironment();
     const sessionEnv = {

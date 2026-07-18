@@ -16,7 +16,7 @@ If the overall request is "you review it too, also ask Claude to review in the b
 Resolve `<plugin-root>` as two directories above this `SKILL.md` file. Always run the companion from that active plugin root:
 `node "<plugin-root>/scripts/claude-companion.mjs" review ...`
 
-Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>` (defaults: model=opus, effort=xhigh; sonnet defaults to high; haiku has no effort)
+Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>` (defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort)
 
 Raw slash-command arguments:
 `$ARGUMENTS`

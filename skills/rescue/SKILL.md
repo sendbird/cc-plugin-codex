@@ -24,6 +24,8 @@ Raw slash-command arguments:
 
 Supported arguments: `--background`, `--wait`, `--resume`, `--resume-last`, `--fresh`, `--write`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`, `--prompt-file <path>`, plus free-text task text
 
+Companion defaults: model=opus, effort=xhigh; sonnet and fable default to high; haiku has no effort.
+
 Main-thread routing rules:
 - If the user explicitly invoked `$cc:rescue` or `Claude Code Rescue`, do not keep the work in the main Codex thread. Delegate it.
 - If the user did not supply a task, ask what Claude Code should investigate or fix.

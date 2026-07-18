@@ -12,7 +12,7 @@
  * - Uses claude-cli.mjs instead of app-server/broker
  * - MODEL_ALIASES: opus -> claude-opus-4-7[1m], sonnet -> claude-sonnet-4-6[1m], haiku -> claude-haiku-4-5
  * - Default model when --model is unset: opus
- * - Default effort by model: opus -> xhigh, sonnet -> high, haiku -> unset
+ * - Default effort by model: opus -> xhigh, sonnet|fable -> high, haiku -> unset
  * - Claude CLI effort values: low, medium, high, xhigh, max
  * - Legacy effort aliases: none|minimal -> low
  * - Review gate matches upstream setup semantics: Stop hook runs when enabled
@@ -137,9 +137,9 @@ function printUsage() {
     [
       "Usage:",
       "  node scripts/claude-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
-      "  node scripts/claude-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>]",
-      "  node scripts/claude-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [focus text]",
-      "  node scripts/claude-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [prompt]",
+      "  node scripts/claude-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>]",
+      "  node scripts/claude-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [focus text]",
+      "  node scripts/claude-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|fable|opus|sonnet|haiku>] [--effort <low|medium|high|xhigh|max>] [prompt]",
       "  node scripts/claude-companion.mjs status [job-id] [--all] [--json]",
       "  node scripts/claude-companion.mjs result [job-id] [--json]",
       "  node scripts/claude-companion.mjs cancel [job-id] [--json]",

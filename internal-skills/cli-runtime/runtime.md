@@ -24,7 +24,7 @@ Command selection:
 
 Routing controls:
 - Treat `--model`, `--effort`, `--resume`, `--resume-last`, `--fresh`, `--prompt-file`, `--view-state`, `--owner-session-id`, and `--job-id` as routing controls, not task text.
-- Leave `--model` and `--effort` unset unless the user explicitly asks for a specific model or effort. The companion command applies these defaults itself: model defaults to `opus`, effort defaults to `xhigh` for opus, `high` for sonnet, and is left unset for haiku.
+- Leave `--model` and `--effort` unset unless the user explicitly asks for a specific model or effort. The companion command applies these defaults itself: model defaults to `opus`, effort defaults to `xhigh` for opus, `high` for sonnet and fable, and is left unset for haiku.
 - `--view-state on-success` means the user will see this companion result in the current turn, so the companion may mark it viewed on success.
 - `--view-state defer` means the parent is not waiting, so the companion must leave the result unread until the user explicitly checks it.
 - `--owner-session-id <session-id>` is an internal parent-session routing control. Preserve it when present so tracked jobs remain visible to the parent session's `$cc:status` / `$cc:result`.
