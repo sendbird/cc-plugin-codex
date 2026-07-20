@@ -10,7 +10,7 @@
  *
  * Adapted from codex-companion.mjs:
  * - Uses claude-cli.mjs instead of app-server/broker
- * - Model aliases and full IDs pass through to Claude Code for resolution
+ * - Friendly model aliases canonicalize to lowercase; other names pass through
  * - Default model when --model is unset: opus
  * - Default effort for friendly model aliases: high
  * - Claude CLI effort values: low, medium, high, xhigh, max

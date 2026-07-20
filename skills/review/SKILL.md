@@ -18,7 +18,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md` file. Always ru
 
 Supported arguments: `--wait`, `--background`, `--base <ref>`, `--scope auto|working-tree|branch`, `--model <model>`, `--effort <low|medium|high|xhigh|max>` (defaults: model=opus; fable, opus, sonnet, and haiku each default to high effort)
 
-Forward `--model` unchanged. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
+Forward `--model` unchanged to the companion. The companion trims surrounding whitespace, canonicalizes the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` to lowercase, then forwards every other `--model` value unchanged to Claude Code. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
 
 Raw slash-command arguments:
 `$ARGUMENTS`

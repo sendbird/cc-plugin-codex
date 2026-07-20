@@ -427,15 +427,24 @@ describe("validateTurnCompletion", () => {
 // ===========================================================================
 
 describe("resolveModel", () => {
-  it("passes Claude Code model aliases through unchanged", () => {
-    for (const alias of ["fable", "opus", "sonnet", "haiku", "default", "opusplan"]) {
+  it("canonicalizes friendly model aliases case-insensitively", () => {
+    for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
       assert.equal(resolveModel(alias), alias);
+      assert.equal(resolveModel(alias.toUpperCase()), alias);
+      assert.equal(resolveModel(`${alias[0].toUpperCase()}${alias.slice(1)}`), alias);
     }
   });
 
-  it("passes full and provider-specific model names through unchanged", () => {
+  it("passes other aliases, full IDs, and provider-specific names through unchanged", () => {
+    for (const alias of ["default", "best", "opusplan", "opus[1m]", "sonnet[1m]"]) {
+      assert.equal(resolveModel(alias), alias);
+    }
     assert.equal(resolveModel("claude-fable-5"), "claude-fable-5");
-    assert.equal(resolveModel("us.anthropic.claude-opus-custom"), "us.anthropic.claude-opus-custom");
+    assert.equal(resolveModel("CLAUDE-FABLE-5"), "CLAUDE-FABLE-5");
+    assert.equal(
+      resolveModel("Us.Anthropic.Claude-Opus-Custom"),
+      "Us.Anthropic.Claude-Opus-Custom"
+    );
   });
 
   it("returns undefined for null/undefined input", () => {
@@ -448,7 +457,8 @@ describe("resolveModel", () => {
     assert.equal(resolveModel("   "), undefined);
   });
 
-  it("trims surrounding whitespace without rewriting the model", () => {
+  it("trims surrounding whitespace before canonicalizing friendly aliases", () => {
+    assert.equal(resolveModel("  OpUs  "), "opus");
     assert.equal(resolveModel("  claude-fable-5  "), "claude-fable-5");
   });
 });

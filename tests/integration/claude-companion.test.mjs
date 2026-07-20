@@ -960,13 +960,14 @@ describe("claude-companion integration", () => {
     try {
       for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
         const argsFile = path.join(testEnv.rootDir, `${alias}-default-effort-args.json`);
+        const requestedAlias = alias.toUpperCase();
         runCompanion(
           [
             "task",
             "--cwd",
             testEnv.workspaceDir,
             "--model",
-            alias,
+            requestedAlias,
             "--quiet-progress",
             `${alias} default effort delay=20`,
           ],
@@ -987,7 +988,7 @@ describe("claude-companion integration", () => {
     }
   });
 
-  it("passes native Fable with high default effort through task and review flows", () => {
+  it("canonicalizes native Fable with high default effort through task and review flows", () => {
     const testEnv = createTestEnvironment();
 
     try {
@@ -998,7 +999,7 @@ describe("claude-companion integration", () => {
           "--cwd",
           testEnv.workspaceDir,
           "--model",
-          "fable",
+          "FaBlE",
           "--quiet-progress",
           "fable task delay=20",
         ],
@@ -1030,7 +1031,7 @@ describe("claude-companion integration", () => {
             "--scope",
             "working-tree",
             "--model",
-            "fable",
+            "FaBlE",
             ...focusText,
           ],
           {

@@ -50,6 +50,25 @@ test("model contracts delegate discovery and alias resolution to Claude Code", (
   for (const contractPath of contracts) {
     const contract = read(contractPath);
     assert.match(contract, /\/model/i, `${contractPath} must point to Claude Code model discovery`);
+    assert.match(
+      contract,
+      /friendly aliases?[^\n]*lowercase/i,
+      `${contractPath} must document friendly alias canonicalization`
+    );
+    assert.match(
+      contract,
+      /every other `--model` value[^\n]*unchanged/i,
+      `${contractPath} must preserve non-friendly model values`
+    );
+  }
+
+  for (const contractPath of contracts.filter((contractPath) => contractPath !== "README.md")) {
+    const contract = read(contractPath);
+    assert.match(
+      contract,
+      /Forward (?:an explicit )?`--model`(?: value)? unchanged to the companion/i,
+      `${contractPath} must preserve the user's model value until the companion boundary`
+    );
   }
 
   const implementation = [

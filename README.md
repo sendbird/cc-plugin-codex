@@ -128,7 +128,7 @@ $cc:review --model opus --effort xhigh  # explicitly raise opus effort
 
 **Flags:** `--base <ref>`, `--scope <auto|working-tree|branch>`, `--wait`, `--background`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`
 
-**Defaults:** model `opus` with `high` effort. Friendly aliases `fable`, `opus`, `sonnet`, and `haiku` pass directly to Claude Code, which resolves them for your account and provider; every friendly alias defaults to `high` effort. Full model IDs and provider-specific names also pass through unchanged and receive no inferred effort. Pass `--model` and `--effort` to override.
+**Defaults:** model `opus` with `high` effort. After trimming surrounding whitespace, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively and canonicalized to lowercase; every friendly alias defaults to `high` effort. Every other `--model` value passes through unchanged for Claude Code to resolve, including full model IDs and provider-specific names, and receives no inferred effort. Pass `--model` and `--effort` to override.
 
 **Model discovery:** run `/model` in Claude Code to see the models and effort levels available to your current account and provider, then pass the selected alias or full ID to this plugin. The plugin intentionally does not maintain a static model catalog or force `[1m]`; Claude Code owns alias versions, managed restrictions, provider routing, and extended-context eligibility.
 

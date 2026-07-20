@@ -646,6 +646,8 @@ export const VALID_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 export const DEFAULT_MODEL = "opus";
 
+const FRIENDLY_ALIASES = new Set(["fable", "opus", "sonnet", "haiku"]);
+
 export const DEFAULT_EFFORT_BY_MODEL = new Map([
   ["fable", "high"],
   ["opus", "high"],
@@ -671,7 +673,9 @@ export function resolveDefaultEffort(model, effort) {
 export function resolveModel(model) {
   if (model == null) return undefined;
   const normalized = String(model).trim();
-  return normalized || undefined;
+  if (!normalized) return undefined;
+  const canonical = normalized.toLowerCase();
+  return FRIENDLY_ALIASES.has(canonical) ? canonical : normalized;
 }
 
 export function resolveEffort(effort) {
