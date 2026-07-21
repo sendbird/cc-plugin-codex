@@ -324,6 +324,36 @@ describe("isProcessAlive", () => {
     // PID 99999999 is extremely unlikely to exist
     assert.equal(isProcessAlive(99999999), false);
   });
+
+  it("treats EPERM as alive when the sandbox denies the probe", () => {
+    const permissionError = Object.assign(new Error("operation not permitted"), {
+      code: "EPERM",
+    });
+
+    assert.equal(
+      isProcessAlive(12345, {
+        killImpl: () => {
+          throw permissionError;
+        },
+      }),
+      true,
+    );
+  });
+
+  it("treats ESRCH as dead when the process does not exist", () => {
+    const missingError = Object.assign(new Error("no such process"), {
+      code: "ESRCH",
+    });
+
+    assert.equal(
+      isProcessAlive(12345, {
+        killImpl: () => {
+          throw missingError;
+        },
+      }),
+      false,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
