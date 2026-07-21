@@ -50,6 +50,9 @@ test("internal runtime references keep the active-root and notification invarian
   assert.match(reviewRuntime, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(reviewRuntime, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
   assert.match(reviewRuntime, /if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call/i);
+  assert.match(reviewRuntime, /`sandbox_permissions: "require_escalated"`/i);
+  assert.match(reviewRuntime, /contact the Claude API for this requested review/i);
+  assert.match(reviewRuntime, /Do not first try the companion command in the default network-disabled sandbox/i);
   assert.match(reviewRuntime, /mention the tool name `send_input` literally/i);
   assert.match(reviewRuntime, /exact tool shape `send_input\(\{ target: <parent-thread-id>, message: <steering-message> \}\)`/i);
   assert.match(reviewRuntime, /do not silently drop the completion notification path when the parent provided a non-empty parent thread id/i);
@@ -64,6 +67,9 @@ test("internal runtime references keep the active-root and notification invarian
   assert.match(rescueRuntime, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(rescueRuntime, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
   assert.match(rescueRuntime, /if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call/i);
+  assert.match(rescueRuntime, /`sandbox_permissions: "require_escalated"`/i);
+  assert.match(rescueRuntime, /contact the Claude API for this requested task/i);
+  assert.match(rescueRuntime, /Do not first try the companion command in the default network-disabled sandbox/i);
   assert.match(rescueRuntime, /allow at most one success-only `send_input` notification before finishing/i);
   assert.match(rescueRuntime, /Mention the tool name `send_input` literally/i);
   assert.match(rescueRuntime, /exact tool shape `send_input\(\{ target: <parent-thread-id>, message: <steering-message> \}\)`/i);
@@ -115,6 +121,9 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(review, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(review, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
   assert.match(review, /if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call/i);
+  assert.match(review, /`sandbox_permissions: "require_escalated"`/i);
+  assert.match(review, /contact the Claude API for this requested review/i);
+  assert.match(review, /do not first try the companion command in the default network-disabled sandbox/i);
   assert.match(review, /allow one extra `send_input` call after a successful shell result/i);
   assert.match(review, /must mention the tool name `send_input` literally/i);
   assert.match(review, /must target the provided parent thread id/i);
@@ -169,6 +178,9 @@ test("review skills keep background execution outside the companion command", ()
   assert.match(adversarial, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(adversarial, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
   assert.match(adversarial, /if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call/i);
+  assert.match(adversarial, /`sandbox_permissions: "require_escalated"`/i);
+  assert.match(adversarial, /contact the Claude API for this requested review/i);
+  assert.match(adversarial, /do not first try the companion command in the default network-disabled sandbox/i);
   assert.match(adversarial, /allow one extra `send_input` call after a successful shell result/i);
   assert.match(adversarial, /must mention the tool name `send_input` literally/i);
   assert.match(adversarial, /must target the provided parent thread id/i);
@@ -257,6 +269,9 @@ test("rescue skill documents the experimental built-in-agent forwarding path", (
   assert.match(rescue, /blocking foreground shell-tool call, not as a background terminal\/session/i);
   assert.match(rescue, /Do not request a shell session id, poll a shell session later, or return before the companion command exits/i);
   assert.match(rescue, /if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call/i);
+  assert.match(rescue, /`sandbox_permissions: "require_escalated"`/i);
+  assert.match(rescue, /contact the Claude API for this requested task/i);
+  assert.match(rescue, /do not first try the companion command in the default network-disabled sandbox/i);
   assert.match(rescue, /prefer these steering messages over embedding the raw result text/i);
   assert.match(rescue, /do not embed the raw Claude result inside the notification message/i);
   assert.match(rescue, /do not include any other prose in that notification message/i);

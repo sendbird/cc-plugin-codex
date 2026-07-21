@@ -124,6 +124,7 @@ Subagent launch:
   - run that command as one blocking foreground shell-tool call, not as a background terminal/session
   - do not request a shell session id, poll a shell session later, or return before the companion command exits
   - if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call
+  - when using `exec_command`, pass `sandbox_permissions: "require_escalated"` and the justification `Allow the Claude Code companion to contact the Claude API for this requested task.` on that one call; do not first try the companion command in the default network-disabled sandbox
   - for foreground rescue only, tell the child to return that command's stdout text exactly, with no preamble, summary, code fence, trimming, normalization, or punctuation changes
   - tell the child to ignore stderr progress chatter such as `[cc] ...` lines and preserve only the stdout-equivalent final result text
   - if a parent thread id is provided for experimental background notification, allow one extra `send_input` call after a successful shell result and before finishing

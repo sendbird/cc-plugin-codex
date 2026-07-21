@@ -934,6 +934,7 @@ function startMockProvider({
               "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
               "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
               "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+              "Use sandbox_permissions: \"require_escalated\" with a justification that allows the Claude Code companion to contact the Claude API. Do not first try the companion command in the default network-disabled sandbox.\n" +
               "Return only that command's stdout text exactly.\n" +
               "Ignore stderr progress chatter such as [cc] lines.\n" +
               "If the tool output includes both stderr progress and a final stdout-style result, preserve only the final stdout-equivalent result text.\n" +
@@ -1009,6 +1010,18 @@ function startMockProvider({
               "built-in child should be told to preserve the exact task text in the command"
             );
           }
+          assert.ok(
+            bodyText.includes("sandbox_permissions") && bodyText.includes("require_escalated"),
+            "built-in child should request targeted escalation for Claude API access"
+          );
+          assert.ok(
+            bodyText.includes("contact the Claude API"),
+            "built-in child should receive a scoped network justification"
+          );
+          assert.ok(
+            bodyText.includes("Do not first try the companion command in the default network-disabled sandbox."),
+            "built-in child should avoid the known ENOTFOUND first attempt"
+          );
           assert.doesNotMatch(
             bodyText,
             /claude-companion\.mjs"\s+task\s+--background|claude-companion\.mjs"\s+task\s+--wait|claude-companion\.mjs\s+task\s+--background|claude-companion\.mjs\s+task\s+--wait/,
@@ -1858,6 +1871,7 @@ describe("Codex direct-skill E2E", () => {
         "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
         "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
         "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+        "Use sandbox_permissions: \"require_escalated\" with the justification Allow the Claude Code companion to contact the Claude API for this requested review. Do not first try the companion command in the default network-disabled sandbox.\n" +
         "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
         JSON.stringify(notificationMessage) + "\n" +
         "Use that same sentence as your own final assistant message.\n" +
@@ -2071,6 +2085,7 @@ describe("Codex direct-skill E2E", () => {
         "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
         "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
         "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+        "Use sandbox_permissions: \"require_escalated\" with the justification Allow the Claude Code companion to contact the Claude API for this requested review. Do not first try the companion command in the default network-disabled sandbox.\n" +
         "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
         JSON.stringify(notificationMessage) + "\n" +
         "Use that same sentence as your own final assistant message.\n" +
