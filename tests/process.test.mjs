@@ -387,4 +387,42 @@ describe("validateProcessIdentity", () => {
   it("returns false for non-existent PID", () => {
     assert.equal(validateProcessIdentity(99999999, "any"), false);
   });
+
+  it("falls back to the liveness probe when the identity probe is denied", () => {
+    const deniedIdentity = () => {
+      throw Object.assign(new Error("spawnSync ps EPERM"), { code: "EPERM" });
+    };
+
+    assert.equal(
+      validateProcessIdentity(12345, "recorded-identity", {
+        identityImpl: deniedIdentity,
+        killImpl: () => {
+          throw Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+        },
+      }),
+      true,
+    );
+
+    assert.equal(
+      validateProcessIdentity(12345, "recorded-identity", {
+        identityImpl: deniedIdentity,
+        killImpl: () => {
+          throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+        },
+      }),
+      false,
+    );
+  });
+
+  it("keeps a failed identity probe that is not a denial classified as dead", () => {
+    assert.equal(
+      validateProcessIdentity(12345, "recorded-identity", {
+        identityImpl: () => {
+          throw new Error("ps: exit=1");
+        },
+        killImpl: () => true,
+      }),
+      false,
+    );
+  });
 });
