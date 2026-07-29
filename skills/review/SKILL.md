@@ -55,6 +55,7 @@ Argument handling:
 Foreground flow:
 - Run:
   `node "<plugin-root>/scripts/claude-companion.mjs" review --view-state on-success <arguments with --wait/--background removed>`
+- Run that companion command with `sandbox_permissions: "require_escalated"` and the justification `Allow the Claude Code companion to contact the Claude API for this requested review.` Do not first try the companion command in the default network-disabled sandbox.
 - Foreground review belongs to the main Codex thread. Do not spawn a review subagent, do not invoke a generic review-runner role, and do not proxy this foreground path through any background worker abstraction.
 - Do not fall back to raw `claude`, `claude-code`, `claude review`, `bash -lc ...claude...`, or any other direct Claude CLI syntax when the companion path is available. The foreground syntax contract here is the resolved companion command above, not a hand-rolled Claude invocation.
 - If the resolved companion command fails, surface that failure. Do not silently retry foreground review through a different CLI shape, a generic review runner, or a custom shell wrapper.
@@ -75,16 +76,12 @@ Background flow:
 - If that helper returns a non-empty `parentThreadId`, pass it into the child prompt as the parent thread id for one-shot completion notification.
 - If it returns an empty `parentThreadId`, omit the notification path instead of emitting a blank thread-id placeholder.
 - Spawn exactly one transient forwarding child through `spawn_agent` with:
-  - `agent_type: "default"`
   - `fork_context: false`
-  - `model: "gpt-5.4-mini"`
   - `reasoning_effort: "medium"`
+  - no `agent_type` and no `model`, so the child uses the built-in default agent and inherits the parent model. Never pin a specific Codex model name here; the available catalog is owned by the host CLI and changes between releases.
 - Prefer a self-contained child message over inheriting parent history. The built-in review child should not rely on full parent thread replay for normal operation.
 - Only consider `fork_context: true` as a last resort for a short follow-up where essential context truly cannot be summarized. Avoid it for large or long-lived threads because it can exhaust the child context window.
-- Before spawning the built-in child, emit one short commentary update that records the attempted subagent model selection. Default text should clearly say the parent is starting the built-in review child with `gpt-5.4-mini` at `medium` effort.
-- If `spawn_agent` rejects `gpt-5.4-mini` with an explicit model-unavailable error such as `Unknown model`, `model unavailable`, or equivalent "not in list / unavailable" wording, retry once with `model: "gpt-5.4"` and the same `reasoning_effort: "medium"`.
-- If that fallback happens, emit one short commentary update that clearly says `gpt-5.4-mini` was unavailable and the parent is retrying with `gpt-5.4`.
-- Do not use that fallback for arbitrary failures.
+- Before spawning the built-in child, emit one short commentary update that clearly says the parent is starting the built-in review child on the inherited model at `medium` effort.
 - The built-in child must be a pure forwarder. It should:
   - run exactly one shell command
   - execute:
@@ -92,6 +89,7 @@ Background flow:
   - run that command as one blocking foreground shell-tool call, not as a background terminal/session
   - do not request a shell session id, poll a shell session later, or return before the companion command exits
   - if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call
+  - when using `exec_command`, pass `sandbox_permissions: "require_escalated"` and the justification `Allow the Claude Code companion to contact the Claude API for this requested review.` on that one call; do not first try the companion command in the default network-disabled sandbox
   - include `--owner-session-id <owner-session-id>` only when the parent resolved a non-empty owner session id
   - include `--job-id <reserved-job-id>` when the parent reserved one
   - include the matching `--cwd <workspace-root>` whenever the command includes that reserved `--job-id`

@@ -19,6 +19,7 @@ Foreground contract:
 - Foreground command:
   - `review --view-state on-success ...`
   - `adversarial-review --view-state on-success ...`
+- Run the companion command with `sandbox_permissions: "require_escalated"` and the justification `Allow the Claude Code companion to contact the Claude API for this requested review.` Do not first try the companion command in the default network-disabled sandbox.
 - Return companion stdout faithfully and do not add review execution commentary around it.
 
 Background contract:
@@ -38,17 +39,16 @@ Background contract:
   - run the companion command as one blocking foreground shell-tool call, not as a background terminal/session
   - do not request a shell session id, poll a shell session later, or return before the companion command exits
   - if the available shell tool is `exec_command`, call it once in non-interactive mode and wait for command exit in that same call
+  - when using `exec_command`, pass `sandbox_permissions: "require_escalated"` and the justification `Allow the Claude Code companion to contact the Claude API for this requested review.` on that one call; do not first try the companion command in the default network-disabled sandbox
   - use at most one `send_input` completion notification on success
   - mention the tool name `send_input` literally in the child instructions
   - use the exact tool shape `send_input({ target: <parent-thread-id>, message: <steering-message> })`
   - do not silently drop the completion notification path when the parent provided a non-empty parent thread id
 
 Spawn-agent defaults:
-- `agent_type: "default"`
 - `fork_context: false`
-- `model: "gpt-5.4-mini"`
 - `reasoning_effort: "medium"`
-- If that model is explicitly unavailable, retry once with `model: "gpt-5.4"` and the same effort.
+- Omit `agent_type` and `model`. The child then uses the built-in default agent and inherits the parent model. Codex only advertises `agent_type` when custom agents are configured, and it owns the model catalog, so pinning either one breaks across host releases.
 
 Completion steering:
 - When a reserved review job id exists, steer to:

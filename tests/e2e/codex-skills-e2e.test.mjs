@@ -502,38 +502,8 @@ function getToolNames(body) {
     .filter(Boolean);
 }
 
-function getToolParameterDescription(body, toolName, parameterName) {
-  return (
-    findTool(body, toolName)?.tool?.parameters?.properties?.[parameterName]
-      ?.description ?? null
-  );
-}
-
 function getToolNamespace(body, toolName) {
   return findTool(body, toolName)?.namespace ?? null;
-}
-
-function extractRoleBlock(description, roleName) {
-  if (!description) {
-    return null;
-  }
-
-  const roleHeader = `${roleName}: {`;
-  const lines = description.split("\n");
-  const startIndex = lines.findIndex((line) => line === roleHeader);
-  if (startIndex < 0) {
-    return null;
-  }
-
-  const block = [];
-  for (let index = startIndex; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (index > startIndex && line.endsWith(": {")) {
-      break;
-    }
-    block.push(line);
-  }
-  return block.join("\n");
 }
 
 function chooseShellTool(body) {
@@ -852,11 +822,7 @@ function startMockProvider({
         res.end(
           JSON.stringify({
             object: "list",
-            data: [
-              { id: "mock-model", object: "model" },
-              { id: "gpt-5.4", object: "model" },
-              { id: "gpt-5.4-mini", object: "model" },
-            ],
+            data: [{ id: "mock-model", object: "model" }],
           })
         );
         return;
@@ -902,30 +868,18 @@ function startMockProvider({
             "multi_agent_v1",
             "spawn_agent should be exposed under the multi_agent_v1 namespace"
           );
-          const agentTypeDescription = getToolParameterDescription(body, "spawn_agent", "agent_type");
           if (mode === "builtin-alias") {
             assert.ok(
               bodyText.includes("--builtin-agent"),
               "legacy built-in rescue alias should preserve the routing flag in the parent turn"
             );
           }
-          const defaultRoleBlock = extractRoleBlock(agentTypeDescription, "default");
           assert.ok(
-            typeof defaultRoleBlock === "string" && defaultRoleBlock.includes("Default agent."),
-            `parent turn should advertise the built-in default role in the spawn_agent schema, saw: ${defaultRoleBlock}`
-          );
-          assert.ok(
-            bodyText.includes("retry once with") && bodyText.includes("gpt-5.4"),
-            "parent turn should include the narrow gpt-5.4 fallback guidance for mini-unavailable errors"
-          );
-          assert.ok(
-            bodyText.includes("Do not use that fallback for arbitrary failures"),
-            "parent turn should forbid broad fallback on generic spawn failures"
+            bodyText.includes("inherits the parent model"),
+            "parent turn should instruct the forwarding child to inherit the parent model instead of pinning a Codex model"
           );
 
           const spawnArgs = {
-            agent_type: "default",
-            model: "gpt-5.4-mini",
             reasoning_effort: "medium",
             message:
               spawnMessage ??
@@ -934,6 +888,7 @@ function startMockProvider({
               "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
               "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
               "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+              "Use sandbox_permissions: \"require_escalated\" with a justification that allows the Claude Code companion to contact the Claude API. Do not first try the companion command in the default network-disabled sandbox.\n" +
               "Return only that command's stdout text exactly.\n" +
               "Ignore stderr progress chatter such as [cc] lines.\n" +
               "If the tool output includes both stderr progress and a final stdout-style result, preserve only the final stdout-equivalent result text.\n" +
@@ -1009,6 +964,18 @@ function startMockProvider({
               "built-in child should be told to preserve the exact task text in the command"
             );
           }
+          assert.ok(
+            bodyText.includes("sandbox_permissions") && bodyText.includes("require_escalated"),
+            "built-in child should request targeted escalation for Claude API access"
+          );
+          assert.ok(
+            bodyText.includes("contact the Claude API"),
+            "built-in child should receive a scoped network justification"
+          );
+          assert.ok(
+            bodyText.includes("Do not first try the companion command in the default network-disabled sandbox."),
+            "built-in child should avoid the known ENOTFOUND first attempt"
+          );
           assert.doesNotMatch(
             bodyText,
             /claude-companion\.mjs"\s+task\s+--background|claude-companion\.mjs"\s+task\s+--wait|claude-companion\.mjs\s+task\s+--background|claude-companion\.mjs\s+task\s+--wait/,
@@ -1858,6 +1825,7 @@ describe("Codex direct-skill E2E", () => {
         "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
         "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
         "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+        "Use sandbox_permissions: \"require_escalated\" with the justification Allow the Claude Code companion to contact the Claude API for this requested review. Do not first try the companion command in the default network-disabled sandbox.\n" +
         "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
         JSON.stringify(notificationMessage) + "\n" +
         "Use that same sentence as your own final assistant message.\n" +
@@ -2071,6 +2039,7 @@ describe("Codex direct-skill E2E", () => {
         "Run that command as one blocking foreground shell-tool call, not as a background terminal or session.\n" +
         "Do not request a shell session id, poll a shell session later, or return before the command exits.\n" +
         "If the shell tool is exec_command, call it once in non-interactive mode and wait for exit in that same call.\n" +
+        "Use sandbox_permissions: \"require_escalated\" with the justification Allow the Claude Code companion to contact the Claude API for this requested review. Do not first try the companion command in the default network-disabled sandbox.\n" +
         "If the command succeeds and a parent thread id is available, send exactly this notification to the parent thread before finishing: " +
         JSON.stringify(notificationMessage) + "\n" +
         "Use that same sentence as your own final assistant message.\n" +

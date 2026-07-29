@@ -163,11 +163,12 @@ export function validateProcessIdentity(pid, expectedIdentity) {
   }
 }
 
-export function isProcessAlive(pid) {
+export function isProcessAlive(pid, options = {}) {
+  const killImpl = options.killImpl ?? process.kill.bind(process);
   try {
-    process.kill(pid, 0);
+    killImpl(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return error?.code === "EPERM";
   }
 }
