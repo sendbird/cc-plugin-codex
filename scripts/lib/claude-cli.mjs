@@ -181,6 +181,9 @@ export class StreamParser {
       finalMessage: "",
       structuredOutput: null,
       receivedTerminalEvent: false,
+      terminalSubtype: null,
+      terminalIsError: false,
+      permissionDenialCount: 0,
       unknownEvents: [],
       parseErrors: [],
       unresolvedParseErrors: 0,
@@ -222,6 +225,12 @@ export class StreamParser {
           return this._handleSystemEvent(event);
         case "result":
           this.state.receivedTerminalEvent = true;
+          this.state.terminalSubtype =
+            typeof event.subtype === "string" ? event.subtype : null;
+          this.state.terminalIsError = event.is_error === true;
+          this.state.permissionDenialCount = Array.isArray(event.permission_denials)
+            ? event.permission_denials.length
+            : 0;
           if (event.result) {
             this.state.finalMessage = mergeTerminalResultText(
               this.state.finalMessage,
@@ -360,6 +369,21 @@ function mergeTerminalResultText(existingText, terminalText) {
 export function validateTurnCompletion(state, exitCode) {
   if (exitCode !== 0) {
     return { status: "failed", exitCode };
+  }
+  if (state.permissionDenialCount > 0) {
+    return {
+      status: "failed",
+      warning: `Claude reported ${state.permissionDenialCount} denied tool call(s).`,
+    };
+  }
+  if (
+    state.terminalIsError ||
+    (state.terminalSubtype && state.terminalSubtype !== "success")
+  ) {
+    return {
+      status: "failed",
+      warning: `Claude terminal result reported ${state.terminalSubtype ?? "is_error=true"}.`,
+    };
   }
   if (state.unresolvedParseErrors > 0) {
     return {

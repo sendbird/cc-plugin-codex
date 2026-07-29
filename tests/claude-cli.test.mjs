@@ -65,6 +65,29 @@ describe("StreamParser", () => {
     assert.equal(parser.state.finalMessage, "");
   });
 
+  it("captures terminal permission denials and error metadata", () => {
+    const parser = new StreamParser();
+    const resultEvent = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      permission_denials: [
+        {
+          tool_name: "Bash",
+          tool_input: { command: "git status --short" },
+        },
+      ],
+      result: "done",
+      session_id: "sess-denied",
+    });
+
+    parser.feed(resultEvent + "\n");
+
+    assert.equal(parser.state.terminalSubtype, "success");
+    assert.equal(parser.state.terminalIsError, false);
+    assert.equal(parser.state.permissionDenialCount, 1);
+  });
+
   it("does not overwrite accumulated deltas with a shorter terminal suffix", () => {
     const parser = new StreamParser();
     const delta = JSON.stringify({
@@ -418,6 +441,38 @@ describe("validateTurnCompletion", () => {
     const state = { receivedTerminalEvent: true, unresolvedParseErrors: 0, unknownEvents: [{ type: "new_type", ts: 1 }] };
     const result = validateTurnCompletion(state, 0);
     assert.equal(result.status, "completed");
+  });
+
+  it("returns failed when Claude denied a tool despite exit code 0", () => {
+    const state = {
+      receivedTerminalEvent: true,
+      unresolvedParseErrors: 0,
+      unknownEvents: [],
+      terminalSubtype: "success",
+      terminalIsError: false,
+      permissionDenialCount: 1,
+    };
+
+    const result = validateTurnCompletion(state, 0);
+
+    assert.equal(result.status, "failed");
+    assert.match(result.warning, /1 denied tool call/u);
+  });
+
+  it("returns failed for an error terminal result despite exit code 0", () => {
+    const state = {
+      receivedTerminalEvent: true,
+      unresolvedParseErrors: 0,
+      unknownEvents: [],
+      terminalSubtype: "error_during_execution",
+      terminalIsError: true,
+      permissionDenialCount: 0,
+    };
+
+    const result = validateTurnCompletion(state, 0);
+
+    assert.equal(result.status, "failed");
+    assert.match(result.warning, /error_during_execution/u);
   });
 });
 
