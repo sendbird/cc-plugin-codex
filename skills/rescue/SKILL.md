@@ -56,16 +56,13 @@ Main-thread routing rules:
 - If a legacy request still includes `--notify-parent-on-complete`, treat it as a compatibility alias. Background built-in rescue now attempts parent wake-up by default.
 
 Subagent launch:
-- By default, use Codex's `spawn_agent` tool with `agent_type: "default"`.
+- By default, use Codex's `spawn_agent` tool. Omit `agent_type`; an omitted `agent_type` already selects the built-in default agent, and Codex only advertises that parameter when custom agents are configured.
 - Never satisfy background rescue by launching `claude-companion.mjs task` itself as a detached shell process. Do not use `&`, `nohup`, detached `spawn`, or any equivalent direct background process launch from the parent.
 - If a legacy request still includes `--builtin-agent`, treat it as a compatibility alias for the default built-in path. It should not change behavior.
 - Prefer `fork_context: false` for the built-in rescue child. The parent should pass a self-contained forwarding message instead of replaying the full parent thread by default.
 - Only consider `fork_context: true` as a last resort for a short follow-up where essential context truly cannot be summarized. Avoid it for large or long-lived threads because it can exhaust the child context window.
-- The built-in rescue path must set `model: "gpt-5.4-mini"` and `reasoning_effort: "medium"` on `spawn_agent` so the transient forwarding child stays cheap and predictable.
-- Before spawning the built-in child, emit one short commentary update that records the attempted subagent model selection. Default text should clearly say the parent is starting the built-in rescue child with `gpt-5.4-mini` at `medium` effort.
-- Prefer `gpt-5.4-mini` for that built-in child, but if `spawn_agent` rejects that model with an explicit model-availability error such as `Unknown model`, `model unavailable`, or equivalent "not in list / unavailable" wording, retry once with `model: "gpt-5.4"` and the same `reasoning_effort: "medium"`.
-- If that fallback happens, emit one short commentary update that clearly says `gpt-5.4-mini` was unavailable and the parent is retrying with `gpt-5.4`.
-- Do not use that fallback for arbitrary failures. If the error is not clearly a model-unavailable problem, surface it instead of silently retrying with `gpt-5.4`.
+- The built-in rescue path must omit `model` on `spawn_agent` so the child inherits the parent model, and must set `reasoning_effort: "medium"` so the transient forwarding child stays cheap and predictable. Never pin a specific Codex model name here; the available catalog is owned by the host CLI and changes between releases.
+- Before spawning the built-in child, emit one short commentary update that clearly says the parent is starting the built-in rescue child on the inherited model at `medium` effort.
 - Remove `--background` and `--wait` before spawning the subagent. Those flags control only whether the main thread waits on the subagent.
 - Pass only the routing and task arguments that actually belong to `claude-companion.mjs task`.
 - If the free-text task begins with `/`, preserve it verbatim in the spawned subagent request. Do not strip the slash or rewrite it into a local Codex command.
