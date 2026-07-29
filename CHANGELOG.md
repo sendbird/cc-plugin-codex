@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0
+
+- Delegate Claude model resolution to Claude Code. `--model` now forwards every value through unchanged, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively, and the plugin no longer pins `claude-opus-4-7[1m]` / `claude-sonnet-4-6[1m]` or forces the 1M-context variant. Run `/model` in Claude Code to discover what your account and provider actually offer. Every friendly alias now defaults to `high` effort, so `opus` moves from `xhigh` to `high` unless you pass `--effort`.
+- Add `fable` as a supported model alias across `review`, `adversarial-review`, and `rescue`, forwarded to Claude Code rather than pinned to a version-specific model ID.
+- Stop pinning `spawn_agent` routing to a Codex-owned catalog. Codex 0.145 only advertises `agent_type` when custom agents are configured and dropped `gpt-5.4-mini` / `gpt-5.4` from the child-model catalog, which broke every built-in background forwarding spawn. The forwarding children now omit `agent_type` and `model`, inheriting the built-in default agent and the parent model while keeping `reasoning_effort: "medium"`.
+- Request targeted `sandbox_permissions: "require_escalated"` for the single Claude companion command in the review, adversarial-review, and rescue forwarding paths. Codex's default `workspace-write` sandbox has no outbound network, so the companion previously started Claude Code only for it to fail with `API Error: Unable to connect to API (ENOTFOUND)`. Global `network_access` is still not required.
+- Stop auto-reaping live background jobs when the sandbox denies a process probe. `isProcessAlive()` now treats `EPERM` as "exists but cannot be signaled", and `validateProcessIdentity()` falls back to that probe when the identity check is denied instead of reporting death. `ESRCH`, absent PIDs, and genuine identity mismatches stay classified as dead, so PID-reuse detection is unchanged.
+- Update GitHub Actions, ESLint, runtime globals, and transitive development dependencies.
+
 ## v1.3.0
 
 - Preserve the originating workspace when reserved background job ids pass through built-in rescue, review, and adversarial-review forwarding children.
