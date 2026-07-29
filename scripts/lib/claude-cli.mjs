@@ -648,26 +648,16 @@ export const DEFAULT_MODEL = "opus";
 
 const FRIENDLY_ALIASES = new Set(["fable", "opus", "sonnet", "haiku"]);
 
-export const DEFAULT_EFFORT_BY_MODEL = new Map([
-  ["fable", "high"],
-  ["opus", "high"],
-  ["sonnet", "high"],
-  ["haiku", "high"],
-]);
-
+// No per-model effort defaults. Which effort levels a model supports — and what
+// it falls back to — is owned by Claude Code, not this plugin: Haiku 4.5 is not
+// in the reasoning-effort model tier at all. Any table here would have to track
+// the host's model catalog and would rot exactly like the pinned model IDs did,
+// so `--effort` is forwarded only when the user asks for it.
 export function resolveDefaultModel(model) {
   if (model == null || String(model).trim() === "") {
     return DEFAULT_MODEL;
   }
   return model;
-}
-
-export function resolveDefaultEffort(model, effort) {
-  if (effort != null && String(effort).trim() !== "") {
-    return effort;
-  }
-  const key = String(model ?? "").trim().toLowerCase();
-  return DEFAULT_EFFORT_BY_MODEL.get(key);
 }
 
 export function resolveModel(model) {
@@ -719,11 +709,16 @@ export function buildArgs(prompt, options = {}) {
   if (options.noSessionPersistence) {
     args.push("--no-session-persistence");
   }
-  if (options.model) {
-    args.push("--model", resolveModel(options.model));
+  // Gate on the resolved value, not the raw input: both resolvers return
+  // undefined for whitespace-only strings, and pushing undefined into argv
+  // throws ERR_INVALID_ARG_TYPE in spawn().
+  const model = resolveModel(options.model);
+  if (model) {
+    args.push("--model", model);
   }
-  if (options.effort) {
-    args.push("--effort", resolveEffort(options.effort));
+  const effort = resolveEffort(options.effort);
+  if (effort) {
+    args.push("--effort", effort);
   }
   if (options.sessionId) {
     args.push("--session-id", options.sessionId);

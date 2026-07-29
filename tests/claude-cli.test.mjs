@@ -5,19 +5,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import * as claudeCli from "../scripts/lib/claude-cli.mjs";
 import {
   StreamParser,
   validateTurnCompletion,
   resolveModel,
   resolveEffort,
   resolveDefaultModel,
-  resolveDefaultEffort,
   resolveClaudeBin,
   buildArgs,
   EFFORT_ALIASES,
   VALID_EFFORTS,
   DEFAULT_MODEL,
-  DEFAULT_EFFORT_BY_MODEL,
   SANDBOX_READ_ONLY_BASH_TOOLS,
   SANDBOX_READ_ONLY_TOOLS,
   SANDBOX_TEMP_DIR,
@@ -464,7 +463,7 @@ describe("resolveModel", () => {
 });
 
 // ===========================================================================
-// resolveDefaultModel / resolveDefaultEffort
+// resolveDefaultModel / effort defaults
 // ===========================================================================
 
 describe("resolveDefaultModel", () => {
@@ -487,38 +486,30 @@ describe("resolveDefaultModel", () => {
   });
 });
 
-describe("resolveDefaultEffort", () => {
-  it("defaults to high for every friendly model alias", () => {
+describe("effort defaults", () => {
+  it("does not export a per-model effort table", () => {
+    assert.equal("DEFAULT_EFFORT_BY_MODEL" in claudeCli, false);
+    assert.equal("resolveDefaultEffort" in claudeCli, false);
+  });
+
+  it("omits --effort for every friendly alias unless the caller asks", () => {
+    // Which effort levels each alias supports is Claude Code's to decide.
+    // Emitting nothing lets the host apply its own per-model default.
     for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
-      assert.equal(resolveDefaultEffort(alias, null), "high");
-      assert.equal(resolveDefaultEffort(alias.toUpperCase(), undefined), "high");
+      assert.equal(buildArgs("p", { model: alias }).includes("--effort"), false);
     }
   });
 
-  it("does not infer effort for full or provider-specific model names", () => {
-    assert.equal(resolveDefaultEffort("claude-opus-4-7[1m]", null), undefined);
-    assert.equal(resolveDefaultEffort("claude-sonnet-4-6", null), undefined);
-    assert.equal(resolveDefaultEffort("us.anthropic.claude-opus-custom", null), undefined);
-    assert.equal(resolveDefaultEffort("some-future-model", null), undefined);
-  });
-
-  it("preserves an explicit effort regardless of model", () => {
-    assert.equal(resolveDefaultEffort("opus", "low"), "low");
-    assert.equal(resolveDefaultEffort("sonnet", "medium"), "medium");
-    assert.equal(resolveDefaultEffort("haiku", "high"), "high");
-    assert.equal(resolveDefaultEffort(null, "max"), "max");
-  });
-
-  it("treats blank effort as missing", () => {
-    assert.equal(resolveDefaultEffort("opus", ""), "high");
-    assert.equal(resolveDefaultEffort("opus", "   "), "high");
-  });
-
-  it("DEFAULT_EFFORT_BY_MODEL contains the expected entries", () => {
-    for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
-      assert.equal(DEFAULT_EFFORT_BY_MODEL.get(alias), "high");
-    }
-    assert.equal(DEFAULT_EFFORT_BY_MODEL.size, 4);
+  it("omits whitespace-only --model / --effort instead of pushing undefined", () => {
+    // Both resolvers return undefined for blank input; pushing that into argv
+    // throws ERR_INVALID_ARG_TYPE in spawn().
+    const args = buildArgs("p", { model: "   ", effort: "  " });
+    assert.equal(args.includes("--model"), false);
+    assert.equal(args.includes("--effort"), false);
+    assert.equal(
+      args.every((value) => typeof value === "string"),
+      true
+    );
   });
 });
 

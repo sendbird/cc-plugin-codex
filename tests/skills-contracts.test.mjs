@@ -16,7 +16,7 @@ function read(relativePath) {
   return fs.readFileSync(path.join(PROJECT_ROOT, relativePath), "utf8");
 }
 
-test("public model contracts document native Fable support and alias effort policy", () => {
+test("public model contracts document native Fable support and host-owned effort defaults", () => {
   const contracts = [
     "README.md",
     "skills/review/SKILL.md",
@@ -28,13 +28,20 @@ test("public model contracts document native Fable support and alias effort poli
   for (const contractPath of contracts) {
     const contract = read(contractPath);
     assert.match(contract, /fable/i, `${contractPath} must document Fable`);
-    for (const alias of ["fable", "opus", "sonnet", "haiku"]) {
-      assert.match(
-        contract,
-        new RegExp(`${alias}[^\\n]*high|high[^\\n]*${alias}`, "i"),
-        `${contractPath} must document ${alias}'s high default effort`
-      );
-    }
+    // Assert only what the plugin controls: no per-model effort default of its
+    // own, and effort support attributed to Claude Code. Do not pin a claim
+    // about how the CLI handles a specific model + effort pair; that is the
+    // host's behavior and this plugin never observes it.
+    assert.match(
+      contract,
+      /Claude Code (owns|defaults)[^\n]*effort|effort[^\n]*Claude Code/i,
+      `${contractPath} must attribute effort defaults to Claude Code`
+    );
+    assert.doesNotMatch(
+      contract,
+      /default(s)? to `?high`? effort/i,
+      `${contractPath} must not claim a plugin-owned per-model effort default`
+    );
   }
 });
 

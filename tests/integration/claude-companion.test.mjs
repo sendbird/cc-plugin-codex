@@ -922,7 +922,7 @@ describe("claude-companion integration", () => {
           testEnv.workspaceDir,
           "--write",
           "--model",
-          "haiku",
+          "sonnet",
           "--effort",
           "high",
           "--prompt-file",
@@ -942,7 +942,7 @@ describe("claude-companion integration", () => {
       const args = JSON.parse(fs.readFileSync(argsFile, "utf8"));
       assert.equal(args[0], "-p");
       assert.ok(args.includes("--model"));
-      assert.equal(args[args.indexOf("--model") + 1], "haiku");
+      assert.equal(args[args.indexOf("--model") + 1], "sonnet");
       assert.ok(args.includes("--effort"));
       assert.equal(args[args.indexOf("--effort") + 1], "high");
       assert.ok(args.includes("--permission-mode"));
@@ -954,7 +954,7 @@ describe("claude-companion integration", () => {
     }
   });
 
-  it("defaults every friendly model alias to high effort", () => {
+  it("omits --effort for every friendly model alias by default", () => {
     const testEnv = createTestEnvironment();
 
     try {
@@ -981,14 +981,14 @@ describe("claude-companion integration", () => {
 
         const args = JSON.parse(fs.readFileSync(argsFile, "utf8"));
         assert.equal(args[args.indexOf("--model") + 1], alias);
-        assert.equal(args[args.indexOf("--effort") + 1], "high");
+        assert.equal(args.includes("--effort"), false);
       }
     } finally {
       cleanupTestEnvironment(testEnv);
     }
   });
 
-  it("canonicalizes native Fable with high default effort through task and review flows", () => {
+  it("canonicalizes native Fable without inferring effort through task and review flows", () => {
     const testEnv = createTestEnvironment();
 
     try {
@@ -1013,7 +1013,7 @@ describe("claude-companion integration", () => {
 
       const taskArgs = JSON.parse(fs.readFileSync(taskArgsFile, "utf8"));
       assert.equal(taskArgs[taskArgs.indexOf("--model") + 1], "fable");
-      assert.equal(taskArgs[taskArgs.indexOf("--effort") + 1], "high");
+      assert.equal(taskArgs.includes("--effort"), false);
 
       setupGitWorkspace(testEnv.workspaceDir);
       seedWorkingTreeDiff(testEnv.workspaceDir);
@@ -1044,7 +1044,7 @@ describe("claude-companion integration", () => {
 
         const invocation = JSON.parse(fs.readFileSync(invocationFile, "utf8"));
         assert.equal(invocation.args[invocation.args.indexOf("--model") + 1], "fable");
-        assert.equal(invocation.args[invocation.args.indexOf("--effort") + 1], "high");
+        assert.equal(invocation.args.includes("--effort"), false);
       }
     } finally {
       cleanupTestEnvironment(testEnv);

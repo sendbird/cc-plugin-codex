@@ -12,7 +12,7 @@
  * - Uses claude-cli.mjs instead of app-server/broker
  * - Friendly model aliases canonicalize to lowercase; other names pass through
  * - Default model when --model is unset: opus
- * - Default effort for friendly model aliases: high
+ * - No effort default: --effort is forwarded only when the user passes it
  * - Claude CLI effort values: low, medium, high, xhigh, max
  * - Legacy effort aliases: none|minimal -> low
  * - Review gate matches upstream setup semantics: Stop hook runs when enabled
@@ -45,7 +45,6 @@ import {
   resolveModel,
   resolveEffort,
   resolveDefaultModel,
-  resolveDefaultEffort,
   SANDBOX_READ_ONLY_TOOLS,
   createSandboxSettings,
   cleanupSandboxSettings,
@@ -1512,7 +1511,6 @@ async function handleReviewCommand(argv, config) {
 
   const requestedModel = resolveModel(options.model);
   const resolvedModel = resolveDefaultModel(requestedModel);
-  const resolvedEffort = resolveDefaultEffort(resolvedModel, options.effort);
 
   await withReleasedReservation(workspaceRoot, explicitJobId, async () => {
     // Validate inside the reservation guard so failures do not leak markers.
@@ -1537,7 +1535,7 @@ async function handleReviewCommand(argv, config) {
         base: options.base,
         scope: options.scope,
         model: resolvedModel,
-        effort: resolvedEffort,
+        effort: options.effort,
         focusText,
         reviewName: config.reviewName,
         markViewedOnSuccess
@@ -1559,7 +1557,7 @@ async function handleReviewCommand(argv, config) {
           base: options.base,
           scope: options.scope,
           model: resolvedModel,
-          effort: resolvedEffort,
+          effort: options.effort,
           focusText,
           reviewName: config.reviewName,
           onProgress: progress,
@@ -1613,8 +1611,7 @@ async function handleTask(argv) {
 
   const requestedModel = resolveModel(options.model);
   const model = resolveDefaultModel(requestedModel);
-  const resolvedEffort = resolveDefaultEffort(model, options.effort);
-  const effort = resolvedEffort ? resolveEffort(resolvedEffort) : null;
+  const effort = options.effort ? resolveEffort(options.effort) : null;
   const prompt = readTaskPrompt(cwd, options, positionals);
   const markViewedOnSuccess = resolveMarkViewedOnSuccess(
     options["view-state"],

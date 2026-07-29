@@ -117,20 +117,20 @@ Quick routing rule:
 Standard read-only review of your current work.
 
 ```text
-$cc:review                          # review uncommitted changes (default: opus + high effort)
+$cc:review                          # review uncommitted changes (default: opus)
 $cc:review --base main              # review branch vs main
 $cc:review --scope branch           # explicitly compare branch tip to base
 $cc:review --background             # run in background, check with $cc:status later
-$cc:review --model sonnet           # switch to sonnet (defaults to high effort)
-$cc:review --model fable            # use Fable (defaults to high effort)
+$cc:review --model sonnet           # switch to sonnet
+$cc:review --model fable            # use Fable
 $cc:review --model opus --effort xhigh  # explicitly raise opus effort
 ```
 
 **Flags:** `--base <ref>`, `--scope <auto|working-tree|branch>`, `--wait`, `--background`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`
 
-**Defaults:** model `opus` with `high` effort. After trimming surrounding whitespace, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively and canonicalized to lowercase; every friendly alias defaults to `high` effort. Every other `--model` value passes through unchanged for Claude Code to resolve, including full model IDs and provider-specific names, and receives no inferred effort. Pass `--model` and `--effort` to override.
+**Defaults:** model `opus`, and no effort at all. After trimming surrounding whitespace, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively and canonicalized to lowercase; every other `--model` value passes through unchanged for Claude Code to resolve, including full model IDs and provider-specific names. `--effort` is forwarded only when you pass it, so each model keeps whatever effort Claude Code defaults to. Claude Code owns which effort levels each model supports, so check `/model` rather than assuming a level applies everywhere.
 
-**Model discovery:** run `/model` in Claude Code to see the models and effort levels available to your current account and provider, then pass the selected alias or full ID to this plugin. The plugin intentionally does not maintain a static model catalog or force `[1m]`; Claude Code owns alias versions, managed restrictions, provider routing, and extended-context eligibility.
+**Model discovery:** run `/model` in Claude Code to see the models and effort levels available to your current account and provider, then pass the selected alias or full ID to this plugin. The plugin intentionally does not maintain a static model catalog, a per-model effort table, or force `[1m]`; Claude Code owns alias versions, supported effort levels, managed restrictions, provider routing, and extended-context eligibility.
 
 Scope `auto` (the default) inspects `git status` and chooses between working-tree and branch automatically.
 
@@ -175,7 +175,7 @@ $cc:rescue --model sonnet --effort medium investigate the flaky test
 | `--fresh` | Force a new task (don't resume) |
 | `--write` | Allow file edits (default) |
 | `--model <model>` | Any Claude Code model alias, full model ID, or provider-specific name; defaults to `opus`. Run `/model` in Claude Code to discover options available to your account and provider. |
-| `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh`, `max` (default: `high` for every friendly model alias) |
+| `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh`, `max`. Unset by default, so the model keeps Claude Code's own effort default. Claude Code owns which levels each model supports. |
 | `--prompt-file <path>` | Read task description from a file |
 
 **Resume behavior:** If you don't pass `--resume` or `--fresh`, rescue checks for a resumable Claude session and asks once whether to continue or start fresh. Your phrasing guides the recommendation — "continue the last run" → resume, "start over" → fresh.
