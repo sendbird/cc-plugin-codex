@@ -502,38 +502,8 @@ function getToolNames(body) {
     .filter(Boolean);
 }
 
-function getToolParameterDescription(body, toolName, parameterName) {
-  return (
-    findTool(body, toolName)?.tool?.parameters?.properties?.[parameterName]
-      ?.description ?? null
-  );
-}
-
 function getToolNamespace(body, toolName) {
   return findTool(body, toolName)?.namespace ?? null;
-}
-
-function extractRoleBlock(description, roleName) {
-  if (!description) {
-    return null;
-  }
-
-  const roleHeader = `${roleName}: {`;
-  const lines = description.split("\n");
-  const startIndex = lines.findIndex((line) => line === roleHeader);
-  if (startIndex < 0) {
-    return null;
-  }
-
-  const block = [];
-  for (let index = startIndex; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (index > startIndex && line.endsWith(": {")) {
-      break;
-    }
-    block.push(line);
-  }
-  return block.join("\n");
 }
 
 function chooseShellTool(body) {
@@ -852,11 +822,7 @@ function startMockProvider({
         res.end(
           JSON.stringify({
             object: "list",
-            data: [
-              { id: "mock-model", object: "model" },
-              { id: "gpt-5.4", object: "model" },
-              { id: "gpt-5.4-mini", object: "model" },
-            ],
+            data: [{ id: "mock-model", object: "model" }],
           })
         );
         return;
@@ -902,30 +868,18 @@ function startMockProvider({
             "multi_agent_v1",
             "spawn_agent should be exposed under the multi_agent_v1 namespace"
           );
-          const agentTypeDescription = getToolParameterDescription(body, "spawn_agent", "agent_type");
           if (mode === "builtin-alias") {
             assert.ok(
               bodyText.includes("--builtin-agent"),
               "legacy built-in rescue alias should preserve the routing flag in the parent turn"
             );
           }
-          const defaultRoleBlock = extractRoleBlock(agentTypeDescription, "default");
           assert.ok(
-            typeof defaultRoleBlock === "string" && defaultRoleBlock.includes("Default agent."),
-            `parent turn should advertise the built-in default role in the spawn_agent schema, saw: ${defaultRoleBlock}`
-          );
-          assert.ok(
-            bodyText.includes("retry once with") && bodyText.includes("gpt-5.4"),
-            "parent turn should include the narrow gpt-5.4 fallback guidance for mini-unavailable errors"
-          );
-          assert.ok(
-            bodyText.includes("Do not use that fallback for arbitrary failures"),
-            "parent turn should forbid broad fallback on generic spawn failures"
+            bodyText.includes("inherits the parent model"),
+            "parent turn should instruct the forwarding child to inherit the parent model instead of pinning a Codex model"
           );
 
           const spawnArgs = {
-            agent_type: "default",
-            model: "gpt-5.4-mini",
             reasoning_effort: "medium",
             message:
               spawnMessage ??
