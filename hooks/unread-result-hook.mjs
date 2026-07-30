@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readHookInput } from "./lib/hook-input.mjs";
+import { detectExternalHostOrigin } from "./lib/host-origin.mjs";
 import { cleanupAfterOfficialUninstall } from "./lib/plugin-install-guard.mjs";
 import {
   getConfig,
@@ -112,7 +113,8 @@ function captureTurnBaseline(workspaceRoot, sessionId, cwd) {
       fingerprint,
     });
   } catch {
-    // Baseline capture is best-effort. If it fails, Stop falls back to running review.
+    // Baseline capture is best-effort. If it fails, Stop skips the review for
+    // this turn rather than reviewing a turn it cannot delimit.
   }
 }
 
@@ -134,7 +136,9 @@ async function main() {
   }
 
   try {
-    setCurrentSession(workspaceRoot, sessionId);
+    setCurrentSession(workspaceRoot, sessionId, {
+      hostOrigin: detectExternalHostOrigin(),
+    });
   } catch {
     // Best effort only: an invalid session id should not fail a user prompt.
   }

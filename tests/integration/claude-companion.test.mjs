@@ -352,7 +352,7 @@ function writeSessionScopedJob(testEnv, jobId, payload) {
   return { stateDir, jobsDir };
 }
 
-function writeCurrentSessionMarker(testEnv, sessionId) {
+function writeCurrentSessionMarker(testEnv, sessionId, options = {}) {
   const realWorkspace = fs.realpathSync.native(testEnv.workspaceDir);
   const workspaceHash = createHash("sha256").update(realWorkspace).digest("hex").slice(0, 12);
   const stateDir = path.join(
@@ -367,7 +367,15 @@ function writeCurrentSessionMarker(testEnv, sessionId) {
   fs.mkdirSync(stateDir, { recursive: true });
   fs.writeFileSync(
     path.join(stateDir, "current-session.json"),
-    JSON.stringify({ sessionId, updatedAt: new Date().toISOString() }, null, 2) + "\n",
+    JSON.stringify(
+      {
+        sessionId,
+        ...(options.hostOrigin ? { hostOrigin: options.hostOrigin } : {}),
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2
+    ) + "\n",
     "utf8"
   );
 }
@@ -1177,6 +1185,95 @@ describe("claude-companion integration", () => {
         fs.readFileSync(branchInvocationFile, "utf8")
       );
       assert.match(branchInvocation.prompt, /branch diff against main/i);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("refuses review delegation from a Claude-Code-driven thread and tells it to review directly", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+      writeCurrentSessionMarker(testEnv, "cc-thread", { hostOrigin: "claude-code" });
+
+      const env = { ...testEnv.env };
+      delete env[SESSION_ID_ENV];
+
+      const result = runCompanionExpectFailure(
+        ["review", "--cwd", testEnv.workspaceDir, "--scope", "working-tree"],
+        { env }
+      );
+
+      assert.match(result.stderr, /driven by Claude Code/);
+      assert.match(result.stderr, /Perform the requested review yourself/);
+      assert.equal(listStoredJobs(testEnv).length, 0);
+
+      const taskResult = runCompanionExpectFailure(
+        ["task", "--cwd", testEnv.workspaceDir, "investigate something"],
+        { env }
+      );
+      assert.match(taskResult.stderr, /Perform the requested task yourself/);
+      assert.equal(listStoredJobs(testEnv).length, 0);
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("keeps delegation open for interactive sessions, other owners, and unstamped state", () => {
+    const testEnv = createTestEnvironment();
+
+    try {
+      setupGitWorkspace(testEnv.workspaceDir);
+      seedWorkingTreeDiff(testEnv.workspaceDir);
+      writeCurrentSessionMarker(testEnv, "cc-thread", { hostOrigin: "claude-code" });
+
+      // Interactive Codex session: the env-file export is present.
+      runCompanion(
+        ["review", "--cwd", testEnv.workspaceDir, "--scope", "working-tree"],
+        { env: { ...testEnv.env, [SESSION_ID_ENV]: "cc-thread" } }
+      );
+
+      // Background forwarding child owned by a different (interactive) parent.
+      writeCurrentSessionMarker(testEnv, "cc-thread", { hostOrigin: "claude-code" });
+      const noEnv = { ...testEnv.env };
+      delete noEnv[SESSION_ID_ENV];
+      runCompanion(
+        [
+          "review",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--scope",
+          "working-tree",
+          "--owner-session-id",
+          "interactive-parent",
+        ],
+        { env: noEnv }
+      );
+
+      // Same owner as the externally driven thread stays refused.
+      writeCurrentSessionMarker(testEnv, "cc-thread", { hostOrigin: "claude-code" });
+      const refused = runCompanionExpectFailure(
+        [
+          "review",
+          "--cwd",
+          testEnv.workspaceDir,
+          "--scope",
+          "working-tree",
+          "--owner-session-id",
+          "cc-thread",
+        ],
+        { env: noEnv }
+      );
+      assert.match(refused.stderr, /driven by Claude Code/);
+
+      // Unstamped current-session state fails open.
+      writeCurrentSessionMarker(testEnv, "plain-session");
+      runCompanion(
+        ["review", "--cwd", testEnv.workspaceDir, "--scope", "working-tree"],
+        { env: noEnv }
+      );
     } finally {
       cleanupTestEnvironment(testEnv);
     }

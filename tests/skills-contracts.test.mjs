@@ -452,3 +452,32 @@ test("simple runtime skills resolve the active plugin root from the skill path",
     assert.doesNotMatch(skillText, /<installed-plugin-root>/i);
   }
 });
+
+test("review skills never hard-require a question tool the thread may not have", () => {
+  const contracts = ["skills/review/SKILL.md", "skills/adversarial-review/SKILL.md"];
+
+  for (const contractPath of contracts) {
+    const contract = read(contractPath);
+    // AskUserQuestion is a Claude Code tool; Codex has no tool by that name.
+    assert.doesNotMatch(
+      contract,
+      /AskUserQuestion/,
+      `${contractPath} must not name a Claude Code tool as Codex's question tool`
+    );
+    assert.match(
+      contract,
+      /request_user_input/,
+      `${contractPath} must name Codex's own question tool`
+    );
+    assert.match(
+      contract,
+      /only when this thread actually has one/i,
+      `${contractPath} must make the ask conditional on that tool existing`
+    );
+    assert.match(
+      contract,
+      /does not exist in non-interactive threads/i,
+      `${contractPath} must state that the question tool is absent headless`
+    );
+  }
+});

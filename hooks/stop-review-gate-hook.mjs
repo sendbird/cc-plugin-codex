@@ -53,6 +53,8 @@ const SKIP_INTERACTIVE_HOOKS_ENV = "CLAUDE_COMPANION_SKIP_INTERACTIVE_HOOKS";
 const STOP_REVIEW_SUCCESS_NOTE = "Claude Code turn-end review passed.";
 const STOP_REVIEW_NO_EDIT_NOTE =
   "Claude Code turn-end review skipped: the most recent turn made no net edits.";
+const STOP_REVIEW_NO_BASELINE_NOTE =
+  "Claude Code turn-end review skipped: no user turn was recorded for this Codex session.";
 const MAX_INLINE_REASON_CHARS = 1_500;
 
 function emitDecision(payload) {
@@ -290,8 +292,14 @@ function evaluateTurnEditGate(cwd, workspaceRoot, sessionId) {
 
   const baseline = readTurnBaseline(workspaceRoot, sessionId);
   if (!baseline?.fingerprint) {
+    // The baseline is written by UserPromptSubmit, so its absence means no user
+    // prompt drove this Codex session and there is no turn to review. Reachable
+    // when another host drives Codex headlessly, e.g. a Claude Code review
+    // thread that inherits this plugin.
     return {
-      shouldSkipReview: false,
+      shouldSkipReview: true,
+      skipStatus: "skipped_no_turn_baseline",
+      skipNote: STOP_REVIEW_NO_BASELINE_NOTE,
       reason: "No turn baseline was recorded for this session.",
       baseline,
       current: null,
@@ -393,13 +401,13 @@ async function main() {
   };
   if (turnEditGate.shouldSkipReview) {
     persistFinal({
-      status: "skipped_no_turn_edits",
+      status: turnEditGate.skipStatus ?? "skipped_no_turn_edits",
       reason: turnEditGate.reason,
       claudeInvoked: false,
       runningTaskNote,
       ...fingerprintFields,
     });
-    logNote(STOP_REVIEW_NO_EDIT_NOTE);
+    logNote(turnEditGate.skipNote ?? STOP_REVIEW_NO_EDIT_NOTE);
     logNote(runningTaskNote);
     return;
   }

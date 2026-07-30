@@ -78,6 +78,7 @@ import {
   generateJobId,
   getConfig,
   getCurrentSession,
+  getCurrentSessionMarker,
   listJobs,
   patchJob,
   JOB_RESERVATION_SUFFIX,
@@ -244,6 +245,36 @@ function alignCurrentSessionToOwner(workspaceRoot, ownerSessionId) {
     return;
   }
   setCurrentSession(workspaceRoot, ownerSessionId);
+}
+
+/**
+ * Refuse delegation from a Codex thread that is itself driven by an external
+ * host (e.g. a headless review thread spawned by Claude Code). Delegating back
+ * to Claude Code from there loops the work between the two assistants.
+ *
+ * Interactive Codex sessions receive SESSION_ID_ENV through the session hook's
+ * env-file export; externally hosted app-server threads do not (measured), so
+ * an absent env session id plus a `hostOrigin` stamp on the current-session
+ * marker identifies the loop. Fail-open everywhere else.
+ */
+function assertDelegationAllowed(workspaceRoot, ownerSessionId, workLabel) {
+  if (process.env[SESSION_ID_ENV]) {
+    return;
+  }
+  const marker = getCurrentSessionMarker(workspaceRoot);
+  if (!marker || marker.hostOrigin !== "claude-code") {
+    return;
+  }
+  if (ownerSessionId && ownerSessionId !== marker.sessionId) {
+    return;
+  }
+  throw new Error(
+    [
+      `This Codex thread is driven by Claude Code, not by a user prompt, so delegating this ${workLabel} back to Claude Code would loop it between the two assistants.`,
+      `Do not retry this command and do not look for another way to reach Claude Code.`,
+      `Perform the requested ${workLabel} yourself in this thread and present your own findings directly.`,
+    ].join("\n")
+  );
 }
 
 async function withReleasedReservation(workspaceRoot, explicitJobId, fn) {
@@ -1515,6 +1546,7 @@ async function handleReviewCommand(argv, config) {
   await withReleasedReservation(workspaceRoot, explicitJobId, async () => {
     // Validate inside the reservation guard so failures do not leak markers.
     config.validateRequest?.(target, focusText);
+    assertDelegationAllowed(workspaceRoot, ownerSessionId, "review");
     const metadata = buildReviewJobMetadata(config.reviewName, target);
     alignCurrentSessionToOwner(workspaceRoot, ownerSessionId);
 
@@ -1634,6 +1666,7 @@ async function handleTask(argv) {
   const ownerSessionId = resolveOwnerSessionId(options["owner-session-id"]);
   const explicitJobId = resolveExplicitJobId(options["job-id"], workspaceRoot);
   await withReleasedReservation(workspaceRoot, explicitJobId, async () => {
+    assertDelegationAllowed(workspaceRoot, ownerSessionId, "task");
     const taskMetadata = buildTaskRunMetadata({
       prompt,
       resumeLast

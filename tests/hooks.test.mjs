@@ -307,6 +307,10 @@ function writeTurnBaselineSnapshot(testEnv, sessionId, fingerprint) {
   );
 }
 
+function writeStaleTurnBaseline(testEnv, sessionId) {
+  writeTurnBaselineSnapshot(testEnv, sessionId, { signature: "stale-baseline" });
+}
+
 describe("hooks", () => {
   it("native plugin hook events stay within upstream Codex hook event names", () => {
     const upstreamHookEventNames = new Set([
@@ -562,6 +566,50 @@ describe("hooks", () => {
     }
   });
 
+  it("stop-review hook skips Claude when no user turn was recorded for the session", () => {
+    const testEnv = createHookEnvironment();
+
+    try {
+      const stateDir = stateDirFor(testEnv.homeDir, testEnv.workspaceDir);
+      fs.mkdirSync(stateDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(stateDir, "config.json"),
+        JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
+        "utf8"
+      );
+
+      // No turn-baseline snapshot: UserPromptSubmit never ran for this session,
+      // which is what a headless Codex thread driven by another host looks like.
+      const argsFile = path.join(testEnv.rootDir, "claude-args.json");
+      const result = runHook(
+        STOP_HOOK,
+        [],
+        {
+          cwd: testEnv.workspaceDir,
+          session_id: "headless-session",
+          last_assistant_message: "review me",
+        },
+        {
+          ...testEnv.env,
+          CLAUDE_ARGS_FILE: argsFile,
+        }
+      );
+
+      assert.equal(result.stdout.trim(), "");
+      assert.match(result.stderr, /no user turn was recorded/i);
+      assert.ok(
+        !fs.existsSync(argsFile),
+        "a session with no recorded user turn should skip Claude invocation"
+      );
+
+      const snapshot = readStopReviewSnapshot(testEnv);
+      assert.equal(snapshot.status, "skipped_no_turn_baseline");
+      assert.equal(snapshot.claudeInvoked, false);
+    } finally {
+      cleanupHookEnvironment(testEnv);
+    }
+  });
+
   it("unread-result hook reaps stale running jobs on UserPromptSubmit", () => {
     const testEnv = createHookEnvironment();
 
@@ -674,6 +722,46 @@ describe("hooks", () => {
     }
   });
 
+  it("session start stamps hostOrigin when the app-server was spawned under Claude Code", () => {
+    const testEnv = createHookEnvironment();
+
+    try {
+      const env = { ...testEnv.env, CLAUDECODE: "1" };
+      delete env.CLAUDE_COMPANION_SESSION_ID;
+      runHook(
+        SESSION_HOOK,
+        [],
+        { cwd: testEnv.workspaceDir, session_id: "cc-thread" },
+        env
+      );
+      assert.equal(readCurrentSessionMarker(testEnv).hostOrigin, "claude-code");
+    } finally {
+      cleanupHookEnvironment(testEnv);
+    }
+  });
+
+  it("session start leaves hostOrigin unset for plain Codex sessions", () => {
+    const testEnv = createHookEnvironment();
+
+    try {
+      const env = { ...testEnv.env };
+      delete env.CLAUDECODE;
+      delete env.CLAUDE_CODE_ENTRYPOINT;
+      delete env.CLAUDE_COMPANION_SESSION_ID;
+      runHook(
+        SESSION_HOOK,
+        [],
+        { cwd: testEnv.workspaceDir, session_id: "plain-session" },
+        env
+      );
+      const marker = readCurrentSessionMarker(testEnv);
+      assert.equal(marker.sessionId, "plain-session");
+      assert.equal("hostOrigin" in marker, false);
+    } finally {
+      cleanupHookEnvironment(testEnv);
+    }
+  });
+
   it("stop-review hook blocks unknown Claude completion states even if partial output looks like ALLOW", () => {
     const testEnv = createHookEnvironment();
 
@@ -685,6 +773,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
 
       const result = runHook(
         STOP_HOOK,
@@ -729,6 +818,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
 
       const result = runHook(
         STOP_HOOK,
@@ -776,6 +866,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
 
       const result = runHook(
         STOP_HOOK,
@@ -816,6 +907,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
 
       const result = runHook(
         STOP_HOOK,
@@ -859,6 +951,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
 
       const result = runHook(
         STOP_HOOK,
@@ -898,6 +991,7 @@ describe("hooks", () => {
         JSON.stringify({ version: 1, stopReviewGate: true }, null, 2) + "\n",
         "utf8"
       );
+      writeStaleTurnBaseline(testEnv, "hook-session");
       writeStateJob(testEnv, "running-review-job", {
         id: "running-review-job",
         status: "running",

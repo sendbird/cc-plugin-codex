@@ -19,6 +19,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { readHookInput } from "./lib/hook-input.mjs";
+import { detectExternalHostOrigin } from "./lib/host-origin.mjs";
 import { cleanupAfterOfficialUninstall } from "./lib/plugin-install-guard.mjs";
 import { setCurrentSession } from "../scripts/lib/state.mjs";
 import { SESSION_ID_ENV } from "../scripts/lib/tracked-jobs.mjs";
@@ -61,7 +62,9 @@ function handleSessionStart(input) {
   // Forward plugin data dir if set
   appendEnvVar(PLUGIN_DATA_ENV, process.env[PLUGIN_DATA_ENV]);
   if (input.session_id && !nestedSession) {
-    setCurrentSession(cwd, input.session_id);
+    setCurrentSession(cwd, input.session_id, {
+      hostOrigin: detectExternalHostOrigin(),
+    });
   }
 }
 

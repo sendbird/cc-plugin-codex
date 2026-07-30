@@ -267,16 +267,17 @@ export function getConfig(cwd) {
 // Current session marker (fallback when Codex does not propagate env vars)
 // ---------------------------------------------------------------------------
 
-export function setCurrentSession(cwd, sessionId) {
+export function setCurrentSession(cwd, sessionId, options = {}) {
   sanitizeId(sessionId, "session ID");
   ensureStateDir(cwd);
   writeAtomic(resolveCurrentSessionFile(cwd), {
     sessionId,
+    ...(options.hostOrigin ? { hostOrigin: String(options.hostOrigin) } : {}),
     updatedAt: nowIso(),
   });
 }
 
-export function getCurrentSession(cwd) {
+function readCurrentSessionPayload(cwd) {
   const filePath = resolveCurrentSessionFile(cwd);
   try {
     const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -290,10 +291,26 @@ export function getCurrentSession(cwd) {
       fs.unlinkSync(filePath);
       return null;
     }
-    return sanitizeId(payload.sessionId, "session ID");
+    sanitizeId(payload.sessionId, "session ID");
+    return payload;
   } catch {
     return null;
   }
+}
+
+export function getCurrentSession(cwd) {
+  return readCurrentSessionPayload(cwd)?.sessionId ?? null;
+}
+
+export function getCurrentSessionMarker(cwd) {
+  const payload = readCurrentSessionPayload(cwd);
+  if (!payload) {
+    return null;
+  }
+  return {
+    sessionId: payload.sessionId,
+    hostOrigin: typeof payload.hostOrigin === "string" ? payload.hostOrigin : null,
+  };
 }
 
 export function clearCurrentSession(cwd, sessionId = null) {
