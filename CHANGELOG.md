@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.0
+
+- Restore the `SessionEnd` hook. Codex 0.146 dispatches `SessionEnd` for root sessions, so the teardown removed in v1.3.0 as non-dispatched now runs again: it reaps background jobs whose process died and clears this session's current-session marker instead of leaving it to age out after seven days. Teardown stays inside Codex's few-second budget — it never kills or waits on live processes, so detached jobs keep running and the `UserPromptSubmit` sweeper still covers them.
+- Stop requiring `[features].plugin_hooks`. Upstream retired that flag (`Stage::Removed`), and native plugin hooks now ride on `[features].hooks` alone. Setup requires only `hooks = true` and strips a leftover `plugin_hooks` line from `~/.codex/config.toml`, the same way it already upgrades the legacy `codex_hooks` alias.
+- Correct the review skills' description of `request_user_input`. Omitting `[tools] experimental_request_user_input` leaves the tool enabled; only an explicit `false` hides it in an interactive thread. The conditional ask is unchanged — it still depends on the thread actually having a question tool.
+
 ## v1.4.2
 
 - Refuse companion delegation from Codex threads that are themselves driven by Claude Code. The reverse-direction plugin (Claude Code → Codex) spawns a bare `codex app-server` that inherits `~/.codex`, so its headless review threads see this plugin's skills and delegated the review back to Claude Code — looping the work between the two assistants and burning minutes on `wait`-tool spins with narration in place of findings. Session hooks now stamp `hostOrigin: "claude-code"` on the current-session marker when Claude Code host env markers (`CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT`) reach them, and `review`, `adversarial-review`, and `task` refuse delegation from such threads with explicit instructions to perform the work directly in that thread. Interactive sessions (env session id present), background forwarding children owned by a different session, and unstamped state all stay open, so the gate fails open everywhere the loop cannot occur.

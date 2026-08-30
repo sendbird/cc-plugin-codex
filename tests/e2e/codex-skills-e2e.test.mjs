@@ -192,7 +192,7 @@ function installHooks(testEnv) {
   const config = fs.readFileSync(configFile, "utf8");
   assert.ok(!fs.existsSync(hooksFile), "native plugin hooks should not install global hooks");
   assert.match(config, /hooks = true/);
-  assert.match(config, /plugin_hooks = true/);
+  assert.doesNotMatch(config, /plugin_hooks/);
 }
 
 function createLocalMarketplaceFixture(testEnv) {
@@ -2154,7 +2154,7 @@ describe("Codex direct-skill E2E", () => {
       const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
       assert.ok(!fs.existsSync(hooksFile), "setup should not install global hooks");
       assert.match(config, /hooks = true/);
-      assert.match(config, /plugin_hooks = true/);
+      assert.doesNotMatch(config, /plugin_hooks/);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);
@@ -2197,7 +2197,7 @@ describe("Codex direct-skill E2E", () => {
       const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
       assert.ok(!fs.existsSync(hooksFile));
       assert.match(config, /hooks = true/);
-      assert.match(config, /plugin_hooks = true/);
+      assert.doesNotMatch(config, /plugin_hooks/);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);

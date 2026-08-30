@@ -59,7 +59,7 @@ describe("install-hooks.mjs", () => {
     const config = fs.readFileSync(configFile, "utf8");
     assert.match(config, /\[features\]/);
     assert.match(config, /hooks = true/);
-    assert.match(config, /plugin_hooks = true/);
+    assert.doesNotMatch(config, /plugin_hooks/);
     assert.match(result.stdout, /native Codex plugin hooks/i);
   });
 
@@ -80,7 +80,7 @@ describe("install-hooks.mjs", () => {
 
     assert.match(config, /\[features\]/);
     assert.match(config, /hooks = true/);
-    assert.match(config, /plugin_hooks = true/);
+    assert.doesNotMatch(config, /plugin_hooks/);
     assert.doesNotMatch(config, /codex_hooks/);
     assert.match(result.stdout, /Enabled native Codex plugin hooks/i);
   });

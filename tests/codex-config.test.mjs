@@ -9,7 +9,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { ensureCodexWritableRoot } from "../scripts/lib/codex-config.mjs";
+import {
+  ensureCodexWritableRoot,
+  ensureNativePluginHooksEnabled,
+  nativePluginHooksStatus,
+} from "../scripts/lib/codex-config.mjs";
 
 const originalExecutable = process.env.CC_PLUGIN_CODEX_EXECUTABLE;
 const originalArgs = process.env.CC_PLUGIN_CODEX_APP_SERVER_ARGS_JSON;
@@ -155,4 +159,29 @@ rl.on("line", (line) => {
     "/target",
   ]);
   assert.equal(await ensureCodexWritableRoot(root, "/target"), false);
+});
+
+it("requires only [features].hooks and strips the retired plugin_hooks gate", () => {
+  const enabled = ensureNativePluginHooksEnabled(
+    "[features]\nhooks = true\nplugin_hooks = true\n"
+  );
+
+  assert.equal(enabled.changed, true);
+  assert.match(enabled.content, /hooks = true/);
+  assert.doesNotMatch(enabled.content, /plugin_hooks/);
+  assert.equal(nativePluginHooksStatus(enabled.content).installed, true);
+
+  const clean = ensureNativePluginHooksEnabled(enabled.content);
+  assert.equal(clean.changed, false);
+});
+
+it("reports native hook status from [features].hooks alone", () => {
+  assert.deepEqual(nativePluginHooksStatus("[features]\nhooks = true\n"), {
+    installed: true,
+    missing: [],
+  });
+  assert.deepEqual(nativePluginHooksStatus("[features]\nplugin_hooks = true\n"), {
+    installed: false,
+    missing: ["hooks"],
+  });
 });

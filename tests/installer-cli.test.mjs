@@ -847,7 +847,7 @@ describe("installer-cli", () => {
 
     assert.match(config, /\[plugins\."cc@sendbird"\]/);
     assert.match(config, /hooks = true/);
-    assert.match(config, /plugin_hooks = true/);
+    assert.doesNotMatch(config, /plugin_hooks/);
     assert.ok(!fs.existsSync(legacyInstallDir), "installer should not create a stable local plugin root");
     assert.ok(!fs.existsSync(hooksFile), "installer should not write global hooks.json");
     assert.ok(fs.existsSync(cachedReviewSkill));

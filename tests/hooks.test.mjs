@@ -313,6 +313,7 @@ function writeStaleTurnBaseline(testEnv, sessionId) {
 
 describe("hooks", () => {
   it("native plugin hook events stay within upstream Codex hook event names", () => {
+    // codex-rs/hooks/src/lib.rs HOOK_EVENT_NAMES
     const upstreamHookEventNames = new Set([
       "PreToolUse",
       "PermissionRequest",
@@ -320,8 +321,12 @@ describe("hooks", () => {
       "PreCompact",
       "PostCompact",
       "SessionStart",
+      "SessionEnd",
       "UserPromptSubmit",
+      "SubagentStart",
+      "SubagentStop",
       "Stop",
+      "Interrupt",
     ]);
     const hooksConfig = JSON.parse(fs.readFileSync(HOOKS_JSON, "utf8"));
     const pluginHookEvents = Object.keys(hooksConfig.hooks ?? {});
@@ -757,6 +762,93 @@ describe("hooks", () => {
       const marker = readCurrentSessionMarker(testEnv);
       assert.equal(marker.sessionId, "plain-session");
       assert.equal("hostOrigin" in marker, false);
+    } finally {
+      cleanupHookEnvironment(testEnv);
+    }
+  });
+
+  it("session end reaps dead background jobs, keeps live ones, and drops the session marker", () => {
+    const testEnv = createHookEnvironment();
+
+    try {
+      const deadPid = spawnSync(process.execPath, ["-e", ""]).pid;
+      // Older than REAP_GRACE_MS so the reaper actually inspects the PID.
+      const createdAt = "2026-04-04T01:00:00Z";
+      writeStateJob(testEnv, "dead-job", {
+        id: "dead-job",
+        status: "running",
+        sessionId: "ending-session",
+        pid: deadPid,
+        createdAt,
+      });
+      writeStateJob(testEnv, "live-job", {
+        id: "live-job",
+        status: "running",
+        sessionId: "ending-session",
+        pid: process.pid,
+        createdAt,
+      });
+      runHook(
+        SESSION_HOOK,
+        [],
+        { cwd: testEnv.workspaceDir, session_id: "ending-session" },
+        testEnv.env
+      );
+
+      runHook(
+        SESSION_HOOK,
+        [],
+        {
+          cwd: testEnv.workspaceDir,
+          session_id: "ending-session",
+          hook_event_name: "SessionEnd",
+          reason: "other",
+        },
+        testEnv.env
+      );
+
+      assert.equal(readStateJob(testEnv, "dead-job").status, "failed");
+      const liveJob = readStateJob(testEnv, "live-job");
+      assert.equal(liveJob.status, "running");
+      assert.equal(liveJob.pid, process.pid);
+      assert.equal(
+        fs.existsSync(
+          path.join(
+            stateDirFor(testEnv.homeDir, testEnv.workspaceDir),
+            "current-session.json"
+          )
+        ),
+        false
+      );
+    } finally {
+      cleanupHookEnvironment(testEnv);
+    }
+  });
+
+  it("session end from another session leaves the current session marker alone", () => {
+    const testEnv = createHookEnvironment();
+
+    try {
+      runHook(
+        SESSION_HOOK,
+        [],
+        { cwd: testEnv.workspaceDir, session_id: "active-session" },
+        testEnv.env
+      );
+
+      runHook(
+        SESSION_HOOK,
+        [],
+        {
+          cwd: testEnv.workspaceDir,
+          session_id: "other-session",
+          hook_event_name: "SessionEnd",
+          reason: "other",
+        },
+        testEnv.env
+      );
+
+      assert.equal(readCurrentSessionMarker(testEnv).sessionId, "active-session");
     } finally {
       cleanupHookEnvironment(testEnv);
     }

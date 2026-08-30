@@ -233,7 +233,7 @@ async function installOrUpdate() {
 
   console.log(`Installed ${PLUGIN_NAME} from ${marketplaceConfig.source} into the Codex plugin cache.`);
   if (hooksChanged) {
-    console.log("Enabled [features].hooks and [features].plugin_hooks in ~/.codex/config.toml.");
+    console.log("Enabled [features].hooks in ~/.codex/config.toml.");
   }
   if (writableRootChanged) {
     console.log(`Allowed plugin state writes under ${pluginDataRoots.join(", ")}.`);
