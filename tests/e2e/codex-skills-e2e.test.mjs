@@ -192,7 +192,7 @@ function installHooks(testEnv) {
   const config = fs.readFileSync(configFile, "utf8");
   assert.ok(!fs.existsSync(hooksFile), "native plugin hooks should not install global hooks");
   assert.match(config, /hooks = true/);
-  assert.match(config, /plugin_hooks = true/);
+  assert.doesNotMatch(config, /plugin_hooks/);
 }
 
 function createLocalMarketplaceFixture(testEnv) {
@@ -2154,7 +2154,7 @@ describe("Codex direct-skill E2E", () => {
       const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
       assert.ok(!fs.existsSync(hooksFile), "setup should not install global hooks");
       assert.match(config, /hooks = true/);
-      assert.match(config, /plugin_hooks = true/);
+      assert.doesNotMatch(config, /plugin_hooks/);
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);
@@ -2197,7 +2197,152 @@ describe("Codex direct-skill E2E", () => {
       const config = fs.readFileSync(path.join(testEnv.codexHome, "config.toml"), "utf8");
       assert.ok(!fs.existsSync(hooksFile));
       assert.match(config, /hooks = true/);
-      assert.match(config, /plugin_hooks = true/);
+      assert.doesNotMatch(config, /plugin_hooks/);
+    } finally {
+      await provider.close();
+      cleanupEnvironment(testEnv);
+    }
+  });
+});
+
+function startPlainProvider() {
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      if (req.method === "GET" && req.url === "/v1/models") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ object: "list", data: [{ id: "mock-model", object: "model" }] }));
+        return;
+      }
+      if (req.method !== "POST" || req.url !== "/v1/responses") {
+        res.writeHead(404);
+        res.end("not found");
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      res.end(
+        formatSse([
+          eventCreated("resp-plain"),
+          eventAssistantMessage("msg-plain", "ok"),
+          eventCompleted("resp-plain"),
+        ])
+      );
+    });
+  });
+
+  return {
+    listen() {
+      return new Promise((resolve) => {
+        server.listen(0, "127.0.0.1", () => resolve(server.address().port));
+      });
+    },
+    close() {
+      return new Promise((resolve) => {
+        server.close(() => resolve());
+      });
+    },
+  };
+}
+
+// Codex trusts hooks one by one: a hook only runs once its current hash is
+// recorded under [hooks.state]. Mirrors upstream's own hooks/list ->
+// config/batchWrite recipe so the dispatch assertions below exercise real hooks.
+function trustPluginHooks(testEnv, cwd) {
+  const clientPath = path.join(PROJECT_ROOT, "scripts", "lib", "codex-app-server.mjs");
+  const script = `
+import { callCodexAppServer } from ${JSON.stringify(clientPath)};
+const cwd = ${JSON.stringify(cwd)};
+const listed = await callCodexAppServer({ cwd, method: "hooks/list", params: { cwds: [cwd] } });
+const hooks = (listed.data ?? []).flatMap((entry) => entry.hooks ?? []);
+const state = Object.fromEntries(hooks.map((hook) => [hook.key, { trusted_hash: hook.currentHash }]));
+if (Object.keys(state).length > 0) {
+  await callCodexAppServer({
+    cwd,
+    method: "config/batchWrite",
+    params: {
+      edits: [{ keyPath: "hooks.state", value: state, mergeStrategy: "upsert" }],
+      filePath: null,
+      expectedVersion: null,
+      reloadUserConfig: true,
+    },
+  });
+}
+process.stdout.write(JSON.stringify(hooks.map((hook) => hook.eventName)));
+`;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd,
+    env: testEnv.env,
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
+
+function readDirNames(dir) {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+function pluginStateWorkspaceDirs(testEnv) {
+  const dataRoot = path.join(testEnv.codexHome, "plugins", "data");
+  return readDirNames(dataRoot).flatMap((pluginDir) => {
+    const stateRoot = path.join(dataRoot, pluginDir, "state");
+    return readDirNames(stateRoot).map((workspace) => path.join(stateRoot, workspace));
+  });
+}
+
+describe("native hook dispatch", () => {
+  it("runs the installed plugin's SessionEnd hook and drops the session marker", async (t) => {
+    if (!codexAvailable()) {
+      t.skip("codex CLI is not available in this environment");
+      return;
+    }
+
+    const testEnv = createEnvironment();
+    // A nested session id would make SessionStart skip the marker this asserts on.
+    delete testEnv.env.CLAUDE_COMPANION_SESSION_ID;
+    const workspaceDir = path.join(testEnv.rootDir, "session-end-workspace");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    setupGitWorkspace(workspaceDir);
+    installPlugin(testEnv);
+
+    const provider = startPlainProvider();
+    testEnv.providerPort = await provider.listen();
+    writeConfigToml(testEnv, testEnv.providerPort);
+
+    try {
+      const trusted = trustPluginHooks(testEnv, workspaceDir);
+      assert.ok(
+        trusted.includes("sessionEnd"),
+        `Codex should discover the plugin SessionEnd hook, saw ${JSON.stringify(trusted)}`
+      );
+
+      const execResult = await runCodexExec(testEnv, "Reply with exactly: ok", {
+        cwd: workspaceDir,
+      });
+      assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
+
+      const stateDirs = pluginStateWorkspaceDirs(testEnv);
+      // SessionStart creates the workspace state dir and writes the marker;
+      // only SessionEnd removes the marker, so an existing dir without one
+      // proves Codex dispatched SessionEnd to this plugin.
+      assert.ok(
+        stateDirs.length > 0,
+        "session hooks should have created a workspace state directory"
+      );
+      for (const stateDir of stateDirs) {
+        assert.ok(
+          !fs.existsSync(path.join(stateDir, "current-session.json")),
+          `SessionEnd should have cleared the session marker in ${stateDir}`
+        );
+      }
     } finally {
       await provider.close();
       cleanupEnvironment(testEnv);

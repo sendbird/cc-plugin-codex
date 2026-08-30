@@ -640,7 +640,7 @@ async function handleSetup(argv) {
 
   if (configureNativePluginHooks()) {
     actionsTaken.push(
-      "Enabled native Codex plugin hooks via [features].hooks and [features].plugin_hooks."
+      "Enabled native Codex plugin hooks via [features].hooks."
     );
     actionsTaken.push("Restart Codex if this session started before the feature change.");
   }

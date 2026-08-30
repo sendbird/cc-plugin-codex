@@ -433,7 +433,7 @@ test("setup skill repairs native plugin hook feature gates before the final setu
   assert.match(setup, /missing native plugin hook features/i);
   assert.match(setup, /hook trust/i);
   assert.match(setup, /\[features\]\.hooks/i);
-  assert.match(setup, /\[features\]\.plugin_hooks/i);
+  assert.doesNotMatch(setup, /plugin_hooks/i);
   assert.match(setup, /native hook trust hashes/i);
   assert.match(setup, /plugin-data destination .* writable-root list/i);
   assert.match(setup, /restart Codex and rerun the same setup command/i);

@@ -10,7 +10,10 @@ function normalizeTrailingNewline(text) {
   return `${String(text).replace(/\s*$/, "")}\n`;
 }
 
-const REQUIRED_NATIVE_HOOK_FEATURES = ["hooks", "plugin_hooks"];
+const REQUIRED_NATIVE_HOOK_FEATURES = ["hooks"];
+// Upstream Codex retired these feature flags; `codex_hooks` became `hooks` and
+// `plugin_hooks` folded into it. Leaving them set keeps dead keys in user config.
+const OBSOLETE_NATIVE_HOOK_FEATURES = ["codex_hooks", "plugin_hooks"];
 const WRITABLE_ROOTS_KEY = "sandbox_workspace_write.writable_roots";
 const MAX_CONFIG_WRITE_ATTEMPTS = 3;
 
@@ -220,7 +223,7 @@ export function ensureNativePluginHooksEnabled(content) {
     if (inFeatures) {
       const featureMatch = trimmed.match(/^([A-Za-z0-9_.-]+)\s*=/);
       const featureKey = featureMatch?.[1] ?? null;
-      if (featureKey === "codex_hooks") {
+      if (OBSOLETE_NATIVE_HOOK_FEATURES.includes(featureKey)) {
         changed = true;
         continue;
       }

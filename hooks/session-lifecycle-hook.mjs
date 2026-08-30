@@ -9,6 +9,7 @@
  * Session lifecycle hook for Codex — Claude Code bridge.
  *
  * SessionStart: Exports CLAUDE_COMPANION_SESSION_ID via CLAUDE_ENV_FILE.
+ * SessionEnd: Reaps dead background jobs and drops the session marker.
  *
  * No broker lifecycle — Claude Code uses direct CLI invocation.
  */
@@ -21,7 +22,11 @@ import { fileURLToPath } from "node:url";
 import { readHookInput } from "./lib/hook-input.mjs";
 import { detectExternalHostOrigin } from "./lib/host-origin.mjs";
 import { cleanupAfterOfficialUninstall } from "./lib/plugin-install-guard.mjs";
-import { setCurrentSession } from "../scripts/lib/state.mjs";
+import {
+  clearCurrentSession,
+  listJobs,
+  setCurrentSession,
+} from "../scripts/lib/state.mjs";
 import { SESSION_ID_ENV } from "../scripts/lib/tracked-jobs.mjs";
 
 export { SESSION_ID_ENV };
@@ -68,6 +73,22 @@ function handleSessionStart(input) {
   }
 }
 
+function handleSessionEnd(input) {
+  const cwd = input.cwd || process.cwd();
+  if (isNestedCodexSession(input.session_id)) {
+    return;
+  }
+  try {
+    // listJobs() runs the PID-reuse-safe stale job reaper. Codex caps SessionEnd
+    // at a few seconds, so teardown never kills or waits on live processes:
+    // detached jobs keep running and the UserPromptSubmit sweeper picks them up.
+    listJobs(cwd);
+  } catch {
+    // Best effort only — teardown must not fail the session shutdown.
+  }
+  clearCurrentSession(cwd, input.session_id ?? null);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -79,6 +100,10 @@ async function main() {
   }
   const eventName = process.argv[2] ?? input.hook_event_name ?? "";
 
+  if (eventName === "SessionEnd") {
+    handleSessionEnd(input);
+    return;
+  }
   if (eventName === "SessionStart" || !eventName) {
     // Default to SessionStart (Codex invokes this on session start)
     handleSessionStart(input);
