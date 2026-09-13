@@ -2,7 +2,7 @@
  * Copyright 2026 Sendbird, Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import * as claudeCli from "../scripts/lib/claude-cli.mjs";
@@ -467,6 +467,42 @@ describe("resolveModel", () => {
 // ===========================================================================
 
 describe("resolveDefaultModel", () => {
+  let savedDefaultModel;
+  beforeEach(() => {
+    savedDefaultModel = process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL;
+    delete process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL;
+  });
+  afterEach(() => {
+    if (savedDefaultModel === undefined) {
+      delete process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL;
+    } else {
+      process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL = savedDefaultModel;
+    }
+  });
+
+  it("uses the configured default for omitted or blank model arguments", () => {
+    process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL = "  provider-model  ";
+    for (const model of [undefined, null, "", "   "]) {
+      assert.equal(resolveDefaultModel(model), "provider-model");
+    }
+    assert.deepEqual(
+      buildArgs("test", { model: resolveDefaultModel() }),
+      ["-p", "--output-format", "json", "--model", "provider-model"]
+    );
+  });
+
+  it("prefers an explicit model over the configured default", () => {
+    process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL = "sonnet";
+    assert.equal(resolveDefaultModel("provider-model"), "provider-model");
+  });
+
+  it("falls back to opus when the configured default is empty or whitespace", () => {
+    for (const value of ["", "   "]) {
+      process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL = value;
+      assert.equal(resolveDefaultModel(), "opus");
+    }
+  });
+
   it("returns 'opus' when model is null/undefined/empty", () => {
     assert.equal(resolveDefaultModel(null), "opus");
     assert.equal(resolveDefaultModel(undefined), "opus");

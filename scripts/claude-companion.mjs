@@ -11,7 +11,7 @@
  * Adapted from codex-companion.mjs:
  * - Uses claude-cli.mjs instead of app-server/broker
  * - Friendly model aliases canonicalize to lowercase; other names pass through
- * - Default model when --model is unset: opus
+ * - Default model when --model is unset: CC_PLUGIN_CODEX_DEFAULT_MODEL, then opus
  * - No effort default: --effort is forwarded only when the user passes it
  * - Claude CLI effort values: low, medium, high, xhigh, max
  * - Legacy effort aliases: none|minimal -> low

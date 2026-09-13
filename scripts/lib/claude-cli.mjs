@@ -655,7 +655,7 @@ const FRIENDLY_ALIASES = new Set(["fable", "opus", "sonnet", "haiku"]);
 // so `--effort` is forwarded only when the user asks for it.
 export function resolveDefaultModel(model) {
   if (model == null || String(model).trim() === "") {
-    return DEFAULT_MODEL;
+    return String(process.env.CC_PLUGIN_CODEX_DEFAULT_MODEL ?? "").trim() || DEFAULT_MODEL;
   }
   return model;
 }
