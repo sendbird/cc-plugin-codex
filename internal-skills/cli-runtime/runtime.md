@@ -24,7 +24,7 @@ Command selection:
 
 Routing controls:
 - Treat `--model`, `--effort`, `--resume`, `--resume-last`, `--fresh`, `--prompt-file`, `--view-state`, `--owner-session-id`, and `--job-id` as routing controls, not task text.
-- Leave `--model` and `--effort` unset unless the user explicitly asks for a specific model or effort. The companion command defaults model to `opus` and forwards no `--effort` at all, so `fable`, `opus`, `sonnet`, and `haiku` each keep whatever effort Claude Code defaults to for them. Claude Code owns which effort levels each model supports; this plugin owns no per-model effort table.
+- Leave `--model` and `--effort` unset unless the user explicitly asks for a specific model or effort. The companion command uses `CC_PLUGIN_CODEX_DEFAULT_MODEL` when configured, otherwise defaults model to `opus` and forwards no `--effort` at all, so `fable`, `opus`, `sonnet`, and `haiku` each keep whatever effort Claude Code defaults to for them. Claude Code owns which effort levels each model supports; this plugin owns no per-model effort table.
 - Forward an explicit `--model` value unchanged to the companion. The companion trims surrounding whitespace, canonicalizes the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` to lowercase, then forwards every other `--model` value unchanged to Claude Code. Claude Code owns alias resolution; `/model` is the authoritative picker for the current account and provider.
 - `--view-state on-success` means the user will see this companion result in the current turn, so the companion may mark it viewed on success.
 - `--view-state defer` means the parent is not waiting, so the companion must leave the result unread until the user explicitly checks it.

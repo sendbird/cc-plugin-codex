@@ -128,7 +128,16 @@ $cc:review --model opus --effort xhigh  # explicitly raise opus effort
 
 **Flags:** `--base <ref>`, `--scope <auto|working-tree|branch>`, `--wait`, `--background`, `--model <model>`, `--effort <low|medium|high|xhigh|max>`
 
-**Defaults:** model `opus`, and no effort at all. After trimming surrounding whitespace, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively and canonicalized to lowercase; every other `--model` value passes through unchanged for Claude Code to resolve, including full model IDs and provider-specific names. `--effort` is forwarded only when you pass it, so each model keeps whatever effort Claude Code defaults to. Claude Code owns which effort levels each model supports, so check `/model` rather than assuming a level applies everywhere.
+**Defaults:** explicit `--model` takes precedence over `CC_PLUGIN_CODEX_DEFAULT_MODEL`, which falls back to `opus` when unset or blank. No effort is forced. After trimming surrounding whitespace, the friendly aliases `fable`, `opus`, `sonnet`, and `haiku` are matched case-insensitively and canonicalized to lowercase; every other `--model` value passes through unchanged for Claude Code to resolve, including full model IDs and provider-specific names. `--effort` is forwarded only when you pass it, so each model keeps whatever effort Claude Code defaults to. Claude Code owns which effort levels each model supports, so check `/model` rather than assuming a level applies everywhere.
+
+To choose a default for review, adversarial review, and rescue, add the variable to the existing `[shell_environment_policy.set]` table in `~/.codex/config.toml` (or create the table if absent):
+
+```toml
+[shell_environment_policy.set]
+CC_PLUGIN_CODEX_DEFAULT_MODEL = "sonnet"
+```
+
+Restart Codex to load the setting. The value may be any alias, full model ID, or provider-specific name accepted by your Claude Code CLI; surrounding whitespace is trimmed. Explicit `--model` still overrides it. This setting does not change the turn-end review gate, which continues to use Claude Code's own defaults.
 
 **Model discovery:** run `/model` in Claude Code to see the models and effort levels available to your current account and provider, then pass the selected alias or full ID to this plugin. The plugin intentionally does not maintain a static model catalog, a per-model effort table, or force `[1m]`; Claude Code owns alias versions, supported effort levels, managed restrictions, provider routing, and extended-context eligibility.
 
@@ -174,7 +183,7 @@ $cc:rescue --model sonnet --effort medium investigate the flaky test
 | `--resume-last` | Alias for `--resume` |
 | `--fresh` | Force a new task (don't resume) |
 | `--write` | Allow file edits (default) |
-| `--model <model>` | Any Claude Code model alias, full model ID, or provider-specific name; defaults to `opus`. Run `/model` in Claude Code to discover options available to your account and provider. |
+| `--model <model>` | Any Claude Code model alias, full model ID, or provider-specific name; defaults to `CC_PLUGIN_CODEX_DEFAULT_MODEL`, then `opus`. Run `/model` in Claude Code to discover options available to your account and provider. |
 | `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh`, `max`. Unset by default, so the model keeps Claude Code's own effort default. Claude Code owns which levels each model supports. |
 | `--prompt-file <path>` | Read task description from a file |
 
