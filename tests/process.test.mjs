@@ -25,7 +25,10 @@ const NODE_BIN = process.execPath;
 
 describe("runCommand", () => {
   it("runs a simple command and captures stdout", () => {
-    const result = runCommand("echo", ["hello"]);
+    const result = runCommand(NODE_BIN, [
+      "-e",
+      "process.stdout.write('hello')",
+    ]);
     assert.equal(result.status, 0);
     assert.equal(result.stdout.trim(), "hello");
     assert.equal(result.signal, null);
@@ -49,13 +52,18 @@ describe("runCommand", () => {
   });
 
   it("preserves command and args in result", () => {
-    const result = runCommand("echo", ["a", "b"]);
-    assert.equal(result.command, "echo");
-    assert.deepEqual(result.args, ["a", "b"]);
+    const args = ["-e", "", "a", "b"];
+    const result = runCommand(NODE_BIN, args);
+    assert.equal(result.command, NODE_BIN);
+    assert.deepEqual(result.args, args);
   });
 
   it("accepts input via options.input", () => {
-    const result = runCommand("cat", [], { input: "stdin data" });
+    const result = runCommand(
+      NODE_BIN,
+      ["-e", "process.stdin.pipe(process.stdout)"],
+      { input: "stdin data" },
+    );
     assert.equal(result.stdout, "stdin data");
   });
 
@@ -105,7 +113,10 @@ describe("runCommand", () => {
 
 describe("runCommandChecked", () => {
   it("returns result for successful command", () => {
-    const result = runCommandChecked("echo", ["ok"]);
+    const result = runCommandChecked(NODE_BIN, [
+      "-e",
+      "process.stdout.write('ok')",
+    ]);
     assert.equal(result.status, 0);
     assert.equal(result.stdout.trim(), "ok");
   });
@@ -361,6 +372,40 @@ describe("isProcessAlive", () => {
 // ---------------------------------------------------------------------------
 
 describe("getProcessIdentity", () => {
+  it("uses the process start time as the Windows identity", () => {
+    let invocation = null;
+    const identity = getProcessIdentity(12345, {
+      platform: "win32",
+      runCommandCheckedImpl: (command, args) => {
+        invocation = { command, args };
+        return { stdout: "638935200000000000\r\n" };
+      },
+    });
+
+    assert.equal(identity, "638935200000000000");
+    assert.equal(invocation?.command, "powershell.exe");
+    assert.deepEqual(invocation?.args, [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "[System.Diagnostics.Process]::GetProcessById(12345).StartTime.ToUniversalTime().Ticks",
+    ]);
+  });
+
+  it("rejects an invalid Windows pid before invoking PowerShell", () => {
+    assert.throws(
+      () =>
+        getProcessIdentity("12345; Write-Output unsafe", {
+          platform: "win32",
+          runCommandCheckedImpl: () => {
+            throw new Error("PowerShell should not run");
+          },
+        }),
+      TypeError,
+    );
+  });
+
   it("returns a non-empty string for the current process", () => {
     const identity = getProcessIdentity(process.pid);
     assert.ok(typeof identity === "string");

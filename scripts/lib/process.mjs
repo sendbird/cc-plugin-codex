@@ -143,16 +143,40 @@ export function formatCommandFailure(result) {
  * Get stable process identity for PID reuse detection.
  * Returns a string that is immutable for the process lifetime.
  */
-export function getProcessIdentity(pid) {
-  if (process.platform === 'darwin') {
-    const row = runCommandChecked('ps', ['-o', 'lstart=,comm=', '-p', String(pid)]);
+export function getProcessIdentity(pid, options = {}) {
+  const platform = options.platform ?? process.platform;
+
+  if (platform === "darwin") {
+    const row = runCommandChecked("ps", [
+      "-o",
+      "lstart=,comm=",
+      "-p",
+      String(pid),
+    ]);
     return row.stdout.trim();
-  } else {
-    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-    const closeParen = stat.lastIndexOf(')');
-    const fields = stat.slice(closeParen + 2).split(' ');
-    return fields[19]; // starttime field
   }
+
+  if (platform === "win32") {
+    if (!Number.isSafeInteger(pid) || pid <= 0) {
+      throw new TypeError("PID must be a positive safe integer.");
+    }
+    const runCommandCheckedImpl =
+      options.runCommandCheckedImpl ?? runCommandChecked;
+    // Process start time is stable for the lifetime of a Windows PID.
+    const row = runCommandCheckedImpl("powershell.exe", [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `[System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToUniversalTime().Ticks`,
+    ]);
+    return row.stdout.trim();
+  }
+
+  const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  const closeParen = stat.lastIndexOf(")");
+  const fields = stat.slice(closeParen + 2).split(" ");
+  return fields[19]; // starttime field
 }
 
 export function validateProcessIdentity(pid, expectedIdentity, options = {}) {

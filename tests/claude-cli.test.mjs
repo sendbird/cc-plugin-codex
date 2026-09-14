@@ -14,6 +14,7 @@ import {
   resolveDefaultModel,
   resolveClaudeBin,
   buildArgs,
+  cancelClaudeProcess,
   EFFORT_ALIASES,
   VALID_EFFORTS,
   DEFAULT_MODEL,
@@ -418,6 +419,30 @@ describe("validateTurnCompletion", () => {
     const state = { receivedTerminalEvent: true, unresolvedParseErrors: 0, unknownEvents: [{ type: "new_type", ts: 1 }] };
     const result = validateTurnCompletion(state, 0);
     assert.equal(result.status, "completed");
+  });
+});
+
+describe("cancelClaudeProcess", () => {
+  it("uses Windows process-tree termination after identity validation", async () => {
+    let termination = null;
+    const result = await cancelClaudeProcess(12345, "recorded-identity", {
+      platform: "win32",
+      validateProcessIdentityImpl: () => true,
+      terminateProcessTreeImpl: (pid, options) => {
+        termination = { pid, options };
+        return {
+          attempted: true,
+          delivered: true,
+          method: "taskkill",
+        };
+      },
+    });
+
+    assert.deepEqual(result, { cancelled: true });
+    assert.deepEqual(termination, {
+      pid: 12345,
+      options: { platform: "win32" },
+    });
   });
 });
 

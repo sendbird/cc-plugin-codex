@@ -14,7 +14,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizePathSlashes, resolvePluginRuntimeRoot } from "./codex-paths.mjs";
-import { getProcessIdentity, validateProcessIdentity } from "./process.mjs";
+import {
+  getProcessIdentity,
+  terminateProcessTree,
+  validateProcessIdentity,
+} from "./process.mjs";
 
 const CLAUDE_PACKAGE_EXE_PARTS = [
   "node_modules",
@@ -927,13 +931,26 @@ export async function runClaudeAdversarialReview(
  * Cancel a running Claude Code process.
  * Uses process group kill with PID identity verification.
  */
-export async function cancelClaudeProcess(pid, pidIdentity) {
+export async function cancelClaudeProcess(pid, pidIdentity, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const validateProcessIdentityImpl =
+    options.validateProcessIdentityImpl ?? validateProcessIdentity;
+
   // Verify PID identity to prevent killing recycled PIDs
-  if (pidIdentity && !validateProcessIdentity(pid, pidIdentity)) {
+  if (pidIdentity && !validateProcessIdentityImpl(pid, pidIdentity)) {
     return {
       cancelled: true,
       note: "Process already exited (PID recycled)",
     };
+  }
+
+  if (platform === "win32") {
+    const terminateProcessTreeImpl =
+      options.terminateProcessTreeImpl ?? terminateProcessTree;
+    const termination = terminateProcessTreeImpl(pid, { platform });
+    return termination.delivered
+      ? { cancelled: true }
+      : { cancelled: true, note: "Process not found" };
   }
 
   // SIGTERM to entire process group
@@ -950,7 +967,7 @@ export async function cancelClaudeProcess(pid, pidIdentity) {
   }
 
   // Escalate to SIGKILL
-  if (pidIdentity && !validateProcessIdentity(pid, pidIdentity)) {
+  if (pidIdentity && !validateProcessIdentityImpl(pid, pidIdentity)) {
     return {
       cancelled: true,
       note: "Process exited during SIGTERM wait",
