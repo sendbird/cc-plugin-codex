@@ -658,6 +658,7 @@ function startDirectSkillProvider({
   const requests = [];
   const errors = [];
   const shellCallIdPrefix = "direct-shell";
+  let capturedJobId = null;
 
   const server = http.createServer((req, res) => {
     const chunks = [];
@@ -688,9 +689,23 @@ function startDirectSkillProvider({
       }
 
       try {
-        const responseIndex = requests.filter(
-          (entry) => entry.method === "POST"
-        ).length;
+        // Native Codex may send background memory requests to this mock provider.
+        // They are not a step in the foreground skill scenario.
+        if (body?.client_metadata?.["x-openai-subagent"] === "memory_consolidation") {
+          res.writeHead(200, { "content-type": "text/event-stream" });
+          res.end(formatSse([
+            eventCreated("resp-fixture-memory"),
+            eventAssistantMessage("msg-fixture-memory", "No fixture memory changes."),
+            eventCompleted("resp-fixture-memory"),
+          ]));
+          return;
+        }
+        // Advance from actual tool receipts, not HTTP request counts (retries and
+        // auxiliary native traffic must never consume a shell command).
+        const missingOutput = shellCommands.findIndex((_, index) =>
+          extractOutputText(body, `${shellCallIdPrefix}-${index + 1}`) === null
+        );
+        const responseIndex = missingOutput < 0 ? shellCommands.length + 1 : missingOutput + 1;
         const bodyText = JSON.stringify(body);
         let events;
 
@@ -705,13 +720,31 @@ function startDirectSkillProvider({
         }
 
         if (responseIndex <= shellCommands.length) {
+          if (responseIndex === 2) {
+            const launchOutput = extractOutputText(body, `${shellCallIdPrefix}-1`);
+            const launchJson = launchOutput?.match(/\{[\s\S]*\}/)?.[0];
+            if (launchJson) {
+              try {
+                const launchPayload = JSON.parse(launchJson);
+                if (typeof launchPayload?.jobId === "string" && launchPayload.jobId) {
+                  capturedJobId = launchPayload.jobId;
+                }
+              } catch {
+                // Non-JSON shell output is valid for ordinary one-shot fixtures.
+              }
+            }
+          }
+          const shellCommand = shellCommands[responseIndex - 1].replaceAll(
+            "<job-id>",
+            capturedJobId ?? "<job-id>"
+          );
           const shellTool = chooseShellTool(body);
           events = [
             eventCreated(`resp-direct-${responseIndex}`),
             eventFunctionCall(
               `${shellCallIdPrefix}-${responseIndex}`,
               shellTool,
-              buildShellArgs(shellTool, shellCommands[responseIndex - 1], cwd)
+              buildShellArgs(shellTool, shellCommand, cwd)
             ),
             eventCompleted(`resp-direct-${responseIndex}`),
           ];
@@ -763,6 +796,49 @@ function startDirectSkillProvider({
     },
   };
 }
+
+it("durable tracked review fixture isolates memory traffic and retries", async () => {
+  const provider = startDirectSkillProvider({
+    userRequest: "fixture-request",
+    shellCommands: ["echo launch", "echo status <job-id>"],
+  });
+  const port = await provider.listen();
+  const user = { role: "user", content: "fixture-request" };
+  const root = { input: [user], tools: [{ type: "function", name: "exec_command" }] };
+  const post = async (body) => {
+    const response = await fetch(`http://127.0.0.1:${port}/v1/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    assert.equal(response.status, 200, text);
+    return text;
+  };
+  try {
+    const first = await post(root);
+    assert.match(first, /echo launch/);
+    const auxiliary = await post({
+      client_metadata: { "x-openai-subagent": "memory_consolidation" },
+      input: [],
+    });
+    assert.match(auxiliary, /No fixture memory changes/);
+    assert.doesNotMatch(auxiliary, /direct-shell/);
+    assert.equal(await post(root), first, "a retry must repeat the same step");
+    const next = await post({
+      ...root,
+      input: [user, {
+        type: "function_call_output", call_id: "direct-shell-1",
+        output: JSON.stringify({ jobId: "review-fixture" }),
+      }],
+    });
+    assert.match(next, /echo status review-fixture/);
+    assert.doesNotMatch(next, /<job-id>/);
+    assert.deepEqual(provider.errors, []);
+  } finally {
+    await provider.close();
+  }
+});
 
 function setupGitWorkspace(workspaceDir) {
   function run(args) {
@@ -1703,6 +1779,8 @@ describe("Codex direct-skill E2E", () => {
 
       assert.equal(execResult.status, 0, execResult.stderr || execResult.stdout);
       const finalMessage = fs.readFileSync(testEnv.outputFile, "utf8");
+      assert.deepEqual(provider.errors.map((error) => error.message), [],
+        "native provider must not skip failed receipt processing");
       assert.match(finalMessage, /Claude Code Review/);
 
       const claudeInvocations = readClaudeInvocations(testEnv.claudeLogFile);
