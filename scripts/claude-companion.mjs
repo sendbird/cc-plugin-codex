@@ -624,6 +624,15 @@ function buildSetupReport(
 // setup
 // ---------------------------------------------------------------------------
 
+function isCodexAppServerUnavailable(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /Failed to start [^:]+:/i.test(message) ||
+    /app-server exited before responding/i.test(message) ||
+    /app-server timed out waiting/i.test(message)
+  );
+}
+
 async function handleSetup(argv) {
   const { options } = parseCommandInput(argv, {
     valueOptions: ["cwd"],
@@ -657,6 +666,7 @@ async function handleSetup(argv) {
   let pluginStateDetail = `plugin data roots verified: ${pluginDataRoots.join(", ")}`;
   let pluginStateNextStep = null;
   let pluginConfig = null;
+  let pluginRootProbeError = null;
   const recordPluginStateFailure = (error) => {
     pluginStateReady = false;
     pluginStateDetail = `unable to access plugin state: ${
@@ -668,14 +678,11 @@ async function handleSetup(argv) {
   try {
     writableRootChanged = await ensureCodexWritableRoots(cwd, pluginDataRoots);
   } catch (error) {
-    pluginStateReady = false;
-    pluginStateDetail = `unable to configure plugin data roots: ${
-      error instanceof Error ? error.message : String(error)
-    }`;
-    pluginStateNextStep =
-      `Allow ${pluginDataRoots.join(", ")} under ` +
-      "`sandbox_workspace_write.writable_roots` in `~/.codex/config.toml`, " +
-      "restart Codex, then rerun `$cc:setup`.";
+    if (isCodexAppServerUnavailable(error)) {
+      pluginRootProbeError = error;
+    } else {
+      throw error;
+    }
   }
   if (writableRootChanged) {
     pluginStateReady = false;
@@ -693,6 +700,13 @@ async function handleSetup(argv) {
     try {
       ensureStateDir(workspaceRoot);
       pluginConfig = getConfig(workspaceRoot);
+      if (pluginRootProbeError) {
+        pluginStateDetail =
+          "plugin data roots app-server check unavailable; direct plugin state access verified: " +
+          (pluginRootProbeError instanceof Error
+            ? pluginRootProbeError.message
+            : String(pluginRootProbeError));
+      }
     } catch (error) {
       recordPluginStateFailure(error);
     }

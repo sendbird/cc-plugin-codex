@@ -721,6 +721,9 @@ describe("claude-companion integration", () => {
 
   it("setup reports plugin-state repair guidance when the app-server is unavailable", () => {
     const testEnv = createTestEnvironment();
+    const codexHome = path.join(testEnv.homeDir, ".codex");
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(path.join(codexHome, "plugins"), "", "utf8");
 
     try {
       const report = runCompanionJson(
@@ -739,11 +742,39 @@ describe("claude-companion integration", () => {
       assert.equal(report.ready, false);
       assert.equal(report.reviewGateEnabled, null);
       assert.equal(report.pluginState.ready, false);
-      assert.match(report.pluginState.detail, /unable to configure/i);
+      assert.match(report.pluginState.detail, /unable to access/i);
       assert.match(
         report.nextSteps.join("\n"),
-        /sandbox_workspace_write\.writable_roots/
+        /Restart Codex.*rerun `\$cc:setup`/
       );
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  it("setup remains ready when the app-server reports spawn EPERM but plugin state is writable", () => {
+    const testEnv = createTestEnvironment();
+    const failingServer = path.join(testEnv.rootDir, "spawn-eperm-app-server.mjs");
+    fs.writeFileSync(
+      failingServer,
+      'process.stderr.write("spawn EPERM\\n"); process.exitCode = 1;\\n',
+      "utf8"
+    );
+
+    try {
+      const report = runCompanionJson(
+        ["setup", "--cwd", testEnv.workspaceDir, "--json"],
+        {
+          env: {
+            ...testEnv.env,
+            CC_PLUGIN_CODEX_EXECUTABLE: process.execPath,
+            CC_PLUGIN_CODEX_APP_SERVER_ARGS_JSON: JSON.stringify([failingServer]),
+          },
+        }
+      );
+
+      assert.equal(report.pluginState.ready, true);
+      assert.match(report.pluginState.detail, /direct plugin state access verified/i);
     } finally {
       cleanupTestEnvironment(testEnv);
     }
