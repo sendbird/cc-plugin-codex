@@ -135,11 +135,22 @@ function cleanupWorktreeDir(worktreePath) {
  * that the reviewer is supposed to inspect — `git status` would report clean,
  * `git diff` would show nothing, and the MCP server pointed at the worktree
  * would mislead Claude into thinking the repo is unchanged. Instead we run in
- * the original repo and rely on the Bash-free allowlist for containment.
+ * the original repo with the Bash-free allowlist. That allowlist limits the
+ * model's tools; it does not stop the repo's project settings from loading.
  *
- * Returns `{ cwd, gitRoot, cleanup }`. `gitRoot` is the path the MCP git server
- * should be rooted at; `cwd` is what the Claude CLI should treat as the
- * working directory.
+ * Returns `{ cwd, gitRoot, cleanup, isolated }`, plus `settingSources` for a
+ * worktree. `gitRoot` is the path the MCP git server should be rooted at;
+ * `cwd` is what the Claude CLI should treat as the working directory.
+ *
+ * `settingSources` is the Claude `--setting-sources` value. The worktree checks
+ * out the commit under review, which may come from anyone, and a print-mode
+ * child does not ask for trust. Its project settings would otherwise load:
+ * hooks would run, `env` would reach the processes the child starts, and
+ * `CLAUDE.md` and rules would reach the model. With `user`, project and local
+ * settings do not load; user settings, managed settings and the `--settings`
+ * file still do. A working-tree review runs in the user's own repository and
+ * loads its project settings without a trust prompt: the plugin treats that
+ * repository as trusted.
  */
 export function createReviewIsolation(repoRoot, target, { label = "review" } = {}) {
   if (target?.mode === "working-tree") {
@@ -156,6 +167,7 @@ export function createReviewIsolation(repoRoot, target, { label = "review" } = {
     gitRoot: worktree.path,
     cleanup: () => worktree.cleanup(),
     isolated: true,
+    settingSources: "user",
   };
 }
 

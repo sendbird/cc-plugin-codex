@@ -63,7 +63,7 @@ npx cc-plugin-codex install
 On Windows, prefer the Sendbird marketplace path or the `npx` helper. The shell-script helper below is POSIX-only.
 Codex CLI's official guidance still treats Windows support as experimental and recommends a WSL workspace for the best Codex experience. Claude Code supports both native Windows and WSL.
 
-> **Prerequisites:** Node.js 18+, Codex with hook support, and `claude` CLI installed and authenticated.
+> **Prerequisites:** Node.js 18+, Codex with hook support, and `claude` CLI installed and authenticated. Branch reviews need Claude Code 2.1.281 or later.
 > If you don't have the Claude CLI yet:
 > ```bash
 > npm install -g @anthropic-ai/claude-code && claude auth login

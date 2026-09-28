@@ -805,6 +805,7 @@ async function executeReviewRun(request) {
             onSpawn: request.onSpawn,
             permissionMode: "dontAsk",
             settingsFile: sandboxSettingsFile,
+            settingSources: isolation.settingSources,
             mcpConfigFile,
             strictMcpConfig: true,
           });
@@ -878,6 +879,7 @@ async function executeReviewRun(request) {
             onSpawn: request.onSpawn,
             permissionMode: "dontAsk",
             settingsFile: sandboxSettingsFile,
+            settingSources: isolation.settingSources,
             mcpConfigFile,
             strictMcpConfig: true,
           }

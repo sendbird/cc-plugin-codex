@@ -14,6 +14,7 @@ import {
   resolveDefaultModel,
   resolveClaudeBin,
   buildArgs,
+  assertSettingSourcesSupported,
   EFFORT_ALIASES,
   VALID_EFFORTS,
   DEFAULT_MODEL,
@@ -797,6 +798,44 @@ describe("buildArgs", () => {
     const idx = args.indexOf("--settings");
     assert.ok(idx >= 0);
     assert.equal(args[idx + 1], "/tmp/s.json");
+  });
+
+  it("includes --setting-sources only when settingSources is provided", () => {
+    const args = buildArgs("p", { settingSources: "user" });
+    assert.equal(args[args.indexOf("--setting-sources") + 1], "user");
+    assert.equal(buildArgs("p", {}).includes("--setting-sources"), false);
+  });
+});
+
+// ===========================================================================
+// assertSettingSourcesSupported
+// ===========================================================================
+
+describe("assertSettingSourcesSupported", () => {
+  it("accepts Claude Code 2.1.281 and later", () => {
+    for (const output of ["2.1.281 (Claude Code)", "2.1.283 (Claude Code)\r\n", "2.2.0", "3.0.0 (Claude Code)"]) {
+      assert.doesNotThrow(() => assertSettingSourcesSupported(output), output);
+    }
+  });
+
+  it("rejects releases with a known --setting-sources gap", () => {
+    for (const output of ["2.1.280 (Claude Code)", "2.1.246 (Claude Code)", "2.1.210 (Claude Code)", "2.0.999", "1.9.300"]) {
+      assert.throws(() => assertSettingSourcesSupported(output), /2\.1\.281 or later/, output);
+    }
+  });
+
+  it("rejects output that does not start with a release version", () => {
+    for (const output of [
+      "",
+      "Claude Code",
+      "claude CLI not found in PATH",
+      "v2.1.283",
+      "2.1.283-rc.1 (Claude Code)",
+      "2.1.283.0",
+      undefined,
+    ]) {
+      assert.throws(() => assertSettingSourcesSupported(output), /Cannot read a Claude Code release version/, String(output));
+    }
   });
 });
 

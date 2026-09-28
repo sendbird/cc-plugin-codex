@@ -155,6 +155,7 @@ describe("createReviewIsolation", () => {
       assert.equal(iso.cwd, repoRoot);
       assert.equal(iso.gitRoot, repoRoot);
       assert.equal(iso.isolated, false);
+      assert.equal(iso.settingSources, undefined);
     } finally {
       iso.cleanup();
     }
@@ -185,6 +186,7 @@ describe("createReviewIsolation", () => {
       assert.notEqual(iso.cwd, repoRoot);
       assert.equal(iso.gitRoot, iso.cwd);
       assert.equal(iso.isolated, true);
+      assert.equal(iso.settingSources, "user");
       assert.ok(fs.existsSync(iso.cwd));
     } finally {
       iso.cleanup();
