@@ -28,6 +28,7 @@ Rules:
 - Before launching the review, stay in read-only inspection mode: inspect git status and diff stats only, then ask at most one user question about whether to wait or run in background.
 - Preserve the user's review scope flags exactly.
 - Do not accept staged-only or unstaged-only review modes.
+- `--base <ref>` reviews the branch against that ref. Do not combine it with `--scope working-tree`; the companion rejects that pair because a working-tree review always compares against `HEAD`.
 - Do not add extra review instructions or focus text. Route those requests to `$cc:adversarial-review`.
 
 Execution mode rules:

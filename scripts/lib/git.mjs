@@ -233,6 +233,20 @@ export function resolveReviewTarget(cwd, options = {}) {
   const state = getWorkingTreeState(cwd);
   const supportedScopes = new Set(["auto", "working-tree", "branch"]);
 
+  if (!supportedScopes.has(requestedScope)) {
+    throw new Error(
+      `Unsupported review scope "${requestedScope}". Use one of: auto, working-tree, branch, or pass --base <ref>.`
+    );
+  }
+
+  // A working-tree review always compares against HEAD, so a base ref would be
+  // ignored. Refuse the pair instead of silently reviewing a different diff.
+  if (baseRef && requestedScope === "working-tree") {
+    throw new Error(
+      `--base cannot be combined with --scope working-tree: a working-tree review compares against HEAD. Drop --base to review uncommitted changes, or drop --scope to review the branch against ${baseRef}.`
+    );
+  }
+
   if (baseRef) {
     return {
       mode: "branch",
@@ -248,12 +262,6 @@ export function resolveReviewTarget(cwd, options = {}) {
       label: "working tree diff",
       explicit: true
     };
-  }
-
-  if (!supportedScopes.has(requestedScope)) {
-    throw new Error(
-      `Unsupported review scope "${requestedScope}". Use one of: auto, working-tree, branch, or pass --base <ref>.`
-    );
   }
 
   if (requestedScope === "branch") {

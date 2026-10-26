@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { collectReviewContext, getWorkingTreeFingerprint } from "../scripts/lib/git.mjs";
+import { collectReviewContext, getWorkingTreeFingerprint, resolveReviewTarget } from "../scripts/lib/git.mjs";
 
 const tempRepos = [];
 
@@ -213,5 +213,54 @@ describe("collectReviewContext", () => {
     assert.equal(fingerprint.signature.length > 0, true);
     assert.equal(typeof fingerprint.stagedDiffHash, "string");
     assert.equal(typeof fingerprint.unstagedDiffHash, "string");
+  });
+});
+
+describe("resolveReviewTarget", () => {
+  function createRepoWithStagedChange() {
+    const repo = createRepo();
+    fs.writeFileSync(path.join(repo, "app.js"), "export const value = 1;\n", "utf8");
+    runGit(repo, ["add", "app.js"]);
+    runGit(repo, ["commit", "-m", "initial"]);
+    fs.writeFileSync(path.join(repo, "app.js"), "export const value = 2;\n", "utf8");
+    runGit(repo, ["add", "app.js"]);
+    return repo;
+  }
+
+  // A branch review of main against main is empty, so silently honoring --base
+  // here would report a clean review of uncommitted work it never looked at.
+  it("refuses --base with --scope working-tree instead of dropping the scope", () => {
+    const repo = createRepoWithStagedChange();
+
+    assert.throws(
+      () => resolveReviewTarget(repo, { base: "main", scope: "working-tree" }),
+      /--base cannot be combined with --scope working-tree/
+    );
+  });
+
+  it("rejects an unknown scope even when --base is given", () => {
+    const repo = createRepoWithStagedChange();
+
+    assert.throws(
+      () => resolveReviewTarget(repo, { base: "main", scope: "staged" }),
+      /Unsupported review scope "staged"/
+    );
+  });
+
+  it("still reviews the branch against --base with the auto or branch scope", () => {
+    const repo = createRepoWithStagedChange();
+
+    for (const scope of [undefined, "auto", "branch"]) {
+      const target = resolveReviewTarget(repo, { base: "main", scope });
+      assert.equal(target.mode, "branch");
+      assert.equal(target.baseRef, "main");
+    }
+  });
+
+  it("still reviews the working tree when only --scope working-tree is given", () => {
+    const repo = createRepoWithStagedChange();
+
+    const target = resolveReviewTarget(repo, { scope: "working-tree" });
+    assert.equal(target.mode, "working-tree");
   });
 });

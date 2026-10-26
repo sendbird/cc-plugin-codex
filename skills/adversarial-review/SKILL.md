@@ -53,6 +53,7 @@ Argument handling:
 - `$cc:adversarial-review` uses the same review target selection as `$cc:review`.
 - It supports working-tree review, branch review, and `--base <ref>`.
 - It does not support `--scope staged` or `--scope unstaged`.
+- Do not combine `--base <ref>` with `--scope working-tree`; the companion rejects that pair because a working-tree review always compares against `HEAD`.
 - Unlike `$cc:review`, it can still take extra focus text after the flags.
 - The companion review process itself always runs in the foreground. Background mode only changes how Codex launches that command.
 - For the detailed execution contract, treat the internal runtime reference at `../../internal-skills/review-runtime/runtime.md` as supporting guidance only. It is an internal reference document, not a public skill to invoke.
