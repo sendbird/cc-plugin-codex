@@ -141,11 +141,14 @@ export function formatCommandFailure(result) {
 
 /**
  * Get stable process identity for PID reuse detection.
- * Returns a string that is immutable for the process lifetime.
+ * Returns a string that is immutable for the process lifetime: the process
+ * start time, which a reused PID cannot share. On macOS this is `lstart` alone;
+ * `comm` is left out because a legitimate `exec` (a shell wrapper launching
+ * Claude) changes it while the process lives on.
  */
 export function getProcessIdentity(pid) {
   if (process.platform === 'darwin') {
-    const row = runCommandChecked('ps', ['-o', 'lstart=,comm=', '-p', String(pid)]);
+    const row = runCommandChecked('ps', ['-o', 'lstart=', '-p', String(pid)]);
     return row.stdout.trim();
   } else {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
@@ -155,10 +158,23 @@ export function getProcessIdentity(pid) {
   }
 }
 
+/**
+ * Whether a probed identity matches a recorded one. Up to v1.5.0 the macOS
+ * identity was `lstart` followed by `comm`; a job recorded then is matched on its
+ * start time, so updating the plugin does not reap a job that is still running.
+ */
+function identityMatches(actual, expected) {
+  if (actual === expected) return true;
+  return typeof expected === "string"
+    && actual.length > 0
+    && expected.startsWith(actual)
+    && /^\s+\S/.test(expected.slice(actual.length));
+}
+
 export function validateProcessIdentity(pid, expectedIdentity, options = {}) {
   const identityImpl = options.identityImpl ?? getProcessIdentity;
   try {
-    return identityImpl(pid) === expectedIdentity;
+    return identityMatches(identityImpl(pid), expectedIdentity);
   } catch (error) {
     // A denied probe (sandboxed `ps`, unreadable /proc entry) means the identity
     // cannot be established, not that the process is gone. Fall back to the

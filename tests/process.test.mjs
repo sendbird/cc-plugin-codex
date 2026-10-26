@@ -4,6 +4,8 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 
 import {
   runCommand,
@@ -412,6 +414,43 @@ describe("validateProcessIdentity", () => {
       }),
       false,
     );
+  });
+
+  // #105: a shell wrapper (CC_PLUGIN_CODEX_CLAUDE_BIN) that execs Claude keeps
+  // its PID and start time, but on macOS `comm` changed, so the live job was
+  // judged dead and auto-reaped.
+  it("still validates a process after it execs another program", { skip: process.platform === "win32" }, async () => {
+    const script = `printf pre; read -r go; exec "${NODE_BIN}" -e 'process.stdout.write("ready"); setTimeout(() => {}, 10000)'`;
+    const child = spawn("/bin/sh", ["-c", script], { stdio: ["pipe", "pipe", "ignore"] });
+    try {
+      const [pre] = await once(child.stdout, "data");
+      assert.equal(String(pre), "pre");
+      const beforeExec = getProcessIdentity(child.pid);
+      child.stdin.end("go\n");
+      const [ready] = await once(child.stdout, "data");
+      assert.equal(String(ready), "ready");
+      assert.equal(isProcessAlive(child.pid), true);
+      assert.equal(validateProcessIdentity(child.pid, beforeExec), true);
+    } finally {
+      child.kill("SIGTERM");
+    }
+  });
+
+  it("rejects a recorded identity with a different start time", () => {
+    assert.equal(
+      validateProcessIdentity(12345, "Mon Oct 26 09:04:16 2026", {
+        identityImpl: () => "Mon Oct 26 09:04:17 2026",
+      }),
+      false,
+    );
+  });
+
+  it("matches an identity recorded with comm (v1.5.0 and earlier) on its start time", () => {
+    const identityImpl = () => "Mon Oct 26 09:04:16 2026";
+    assert.equal(validateProcessIdentity(12345, "Mon Oct 26 09:04:16 2026     /bin/zsh", { identityImpl }), true);
+    assert.equal(validateProcessIdentity(12345, "Mon Oct 26 09:04:15 2026     /bin/zsh", { identityImpl }), false);
+    assert.equal(validateProcessIdentity(12345, "Mon Oct 26 09:04:16 20260", { identityImpl }), false);
+    assert.equal(validateProcessIdentity(12345, "  anything", { identityImpl: () => "" }), false);
   });
 
   it("keeps a failed identity probe that is not a denial classified as dead", () => {
