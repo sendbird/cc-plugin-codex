@@ -749,6 +749,69 @@ describe("claude-companion integration", () => {
     }
   });
 
+  it("setup recognizes trusted plugin hooks reported through a symlinked plugin root", () => {
+    const testEnv = createTestEnvironment();
+    // An alternate CODEX_HOME whose plugins dir symlinks to the shared cache:
+    // hooks/list reports the alias path, the companion runs from the real path.
+    const aliasRoot = path.join(testEnv.rootDir, "alias-plugin-root");
+    fs.symlinkSync(PROJECT_ROOT, aliasRoot, "dir");
+    const aliasSourcePath = path.join(aliasRoot, "hooks", "hooks.json");
+    const outsideDir = path.join(testEnv.rootDir, "outside-plugin", "hooks");
+    fs.mkdirSync(outsideDir, { recursive: true });
+    fs.copyFileSync(path.join(PROJECT_ROOT, "hooks", "hooks.json"), path.join(outsideDir, "hooks.json"));
+    const hook = (event, order, extra = {}) => ({
+      key: `cc@sendbird:hooks/hooks.json:${event}:0:0`,
+      eventName: event,
+      handlerType: "command",
+      matcher: null,
+      command: "node hook.mjs",
+      timeoutSec: 600,
+      statusMessage: null,
+      sourcePath: aliasSourcePath,
+      source: "plugin",
+      pluginId: "cc@sendbird",
+      displayOrder: order,
+      enabled: true,
+      isManaged: false,
+      currentHash: `sha256:${event}`,
+      trustStatus: "trusted",
+      ...extra,
+    });
+    const hooks = [
+      hook("session_start", 0),
+      hook("stop", 1),
+      hook("user_prompt_submit", 2),
+      // Same plugin id but a real file outside the plugin root: must stay rejected.
+      hook("pre_tool_use", 3, {
+        key: "cc@sendbird:outside:pre_tool_use:0:0",
+        sourcePath: path.join(outsideDir, "hooks.json"),
+        trustStatus: "untrusted",
+      }),
+    ];
+    const fakeCodex = createFakeCodexAppServer(testEnv, hooks);
+
+    try {
+      const report = runCompanionJson(["setup", "--cwd", testEnv.workspaceDir, "--json"], {
+        env: {
+          ...testEnv.env,
+          CC_PLUGIN_CODEX_EXECUTABLE: process.execPath,
+          CC_PLUGIN_CODEX_APP_SERVER_ARGS_JSON: JSON.stringify([fakeCodex.serverPath]),
+          CC_PLUGIN_CODEX_FORCE_HOOK_TRUST: "1",
+        },
+      });
+      assert.equal(report.hookTrust.ready, true);
+      assert.equal(report.hookTrust.found, 3);
+      assert.equal(report.hookTrust.trusted, 0);
+      assert.doesNotMatch(report.nextSteps.join("\n"), /trust this plugin's hooks manually/);
+      const wroteTrust = readJsonLines(fakeCodex.logPath).some(
+        (r) => r.method === "config/batchWrite" && r.params.edits.some((e) => e.keyPath === "hooks.state")
+      );
+      assert.equal(wroteTrust, false, "outside-root hook must not be trusted");
+    } finally {
+      cleanupTestEnvironment(testEnv);
+    }
+  });
+
   it("setup trusts current native plugin hooks through Codex hooks/list", () => {
     const testEnv = createTestEnvironment();
     const sourcePath = path.join(PROJECT_ROOT, "hooks", "hooks.json");
