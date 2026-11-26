@@ -16,7 +16,7 @@ export function normalizePathSlashes(value) {
   return value.replace(/\\/g, "/");
 }
 
-function canonicalPath(candidate) {
+export function canonicalPath(candidate) {
   try {
     return fs.realpathSync.native(candidate);
   } catch {

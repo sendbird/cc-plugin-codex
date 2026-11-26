@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 
 import { parseArgs, splitRawArgumentString } from "./lib/args.mjs";
 import {
+  canonicalPath,
   resolveCodexHome,
   resolveExpectedPluginDataRoot,
   resolvePluginCacheInstallInfo,
@@ -398,7 +399,9 @@ function pathIsInsideRoot(filePath) {
   if (typeof filePath !== "string" || !filePath) {
     return false;
   }
-  const relativePath = path.relative(ROOT_DIR, path.resolve(filePath));
+  // Codex may report the hook through a symlinked CODEX_HOME, e.g. a second
+  // profile whose plugins dir links to the shared cache.
+  const relativePath = path.relative(canonicalPath(ROOT_DIR), canonicalPath(filePath));
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
