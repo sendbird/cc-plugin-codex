@@ -754,7 +754,11 @@ describe("claude-companion integration", () => {
     // An alternate CODEX_HOME whose plugins dir symlinks to the shared cache:
     // hooks/list reports the alias path, the companion runs from the real path.
     const aliasRoot = path.join(testEnv.rootDir, "alias-plugin-root");
-    fs.symlinkSync(PROJECT_ROOT, aliasRoot, "dir");
+    fs.symlinkSync(
+      PROJECT_ROOT,
+      aliasRoot,
+      process.platform === "win32" ? "junction" : "dir"
+    );
     const aliasSourcePath = path.join(aliasRoot, "hooks", "hooks.json");
     const outsideDir = path.join(testEnv.rootDir, "outside-plugin", "hooks");
     fs.mkdirSync(outsideDir, { recursive: true });
